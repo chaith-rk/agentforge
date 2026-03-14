@@ -1,7 +1,7 @@
 """FastAPI application entry point.
 
-Initializes the application with all middleware, routers, and the
-event store. Uses lifespan for clean startup/shutdown.
+Initializes the application with all middleware, routers, the event store,
+and the call manager. Uses lifespan for clean startup/shutdown.
 """
 
 from __future__ import annotations
@@ -17,6 +17,7 @@ from src.api.calls import router as calls_router
 from src.api.dashboard import router as dashboard_router
 from src.config.settings import settings
 from src.database.event_store import EventStore
+from src.engine.call_manager import CallManager
 from src.middleware.security import APIKeyMiddleware
 from src.webhooks.vapi_handler import router as vapi_router
 
@@ -35,8 +36,9 @@ structlog.configure(
 
 logger = structlog.get_logger(__name__)
 
-# Global event store instance
+# Global instances — shared across the application
 event_store = EventStore()
+call_manager = CallManager(event_store=event_store)
 
 
 @asynccontextmanager
@@ -46,6 +48,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info("application_starting", environment=settings.environment.value)
     await event_store.initialize()
     logger.info("event_store_initialized")
+
+    # Pre-load agent configs
+    try:
+        call_manager.load_agent_config("agents/employment_verification_call.yaml")
+        logger.info("agent_config_loaded", agent_id="employment_verification_v1")
+    except Exception as e:
+        logger.warning("agent_config_load_failed", error=str(e))
 
     yield
 
@@ -81,4 +90,8 @@ app.include_router(dashboard_router)
 @app.get("/health", tags=["system"])
 async def health_check() -> dict[str, str]:
     """Health check endpoint for monitoring and load balancers."""
-    return {"status": "healthy", "version": "0.1.0"}
+    return {
+        "status": "healthy",
+        "version": "0.1.0",
+        "active_calls": str(len(call_manager._active_calls)),
+    }

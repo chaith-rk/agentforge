@@ -4,22 +4,24 @@
 
 ## Current Status
 
-**Phase 2 in progress.** Project scaffolding complete. Core backend, agent configs, infrastructure, and documentation delivered. Next: Vapi account setup and integration testing.
+**Phase 1 complete. Phase 2 in progress.** Vapi validated — real phone calls working from backend. Next: load the employment verification prompt and test the actual verification conversation.
 
 ---
 
 ## Phase 1: Vapi Setup + Hello World
-**Status:** 🔲 Not Started
-**Target:** Day 1
+**Status:** ✅ Complete
+**Completed:** 2026-03-14
 
-- [ ] Create Vapi account
-- [ ] Explore dashboard: assistants, phone numbers, function calls, webhooks
-- [ ] Create a trivial test assistant
-- [ ] Provision a phone number
-- [ ] Make a test outbound call
-- [ ] Review recording, assess voice quality and latency
+- [x] Create Vapi account
+- [x] Explore dashboard: assistants, phone numbers, function calls, webhooks
+- [x] Create a trivial test assistant
+- [x] Provision a phone number (417c8880)
+- [x] Make a test outbound call (from backend via VapiClient)
+- [x] Review recording, assess voice quality and latency
+- [x] Tune speed (1.2x) and interruption handling
 
-**Success criteria:** You've heard your AI agent on a real phone call.
+**Success criteria:** ✅ AI agent conducted real phone calls with acceptable quality.
+**Notes:** Voice speed needed adjustment (default too slow). Interruption handling improved with prompt guidance. Latency acceptable.
 
 ---
 
