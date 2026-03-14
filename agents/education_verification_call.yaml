@@ -1,0 +1,142 @@
+# Education Verification Agent — Skeleton
+# This demonstrates the platform's multi-agent capability.
+# A new agent type = a new YAML file, zero code changes.
+
+agent_id: education_verification_v1
+agent_name: "Education Verification Agent"
+version: "0.1.0"
+description: >
+  AI voice agent for verifying candidate education history with
+  educational institutions. Skeleton config for Phase 7 platform demo.
+
+voice_config:
+  provider: vapi
+  voice_id: ""
+  speed: 1.0
+  temperature: 0.3
+
+initial_state: GREETING
+
+system_prompt_template: "prompts/education_verification_call.md"
+
+compliance_checkpoints:
+  - name: never_disclose_requestor
+    description: "Never reveal who requested the verification"
+    validation_rule: never_disclose_requestor
+    failure_action: warn
+    error_message: "Potential requestor disclosure"
+
+states:
+  GREETING:
+    name: GREETING
+    description: "Open the call with recorded line disclosure"
+    transitions:
+      - trigger: registrar_available
+        target_state: VERIFY_INSTITUTION
+      - trigger: voicemail
+        target_state: LEAVE_VOICEMAIL
+    data_points_to_collect: []
+    compliance_checkpoints:
+      - name: recorded_line_disclosure
+        description: "Must mention recorded line"
+        validation_rule: recorded_line_disclosure
+        failure_action: block
+        error_message: "Recorded line disclosure required"
+    is_terminal: false
+
+  VERIFY_INSTITUTION:
+    name: VERIFY_INSTITUTION
+    description: "Confirm the institution name"
+    transitions:
+      - trigger: institution_confirmed
+        target_state: VERIFY_DEGREE
+    data_points_to_collect:
+      - institution_name_confirmed
+    compliance_checkpoints: []
+    is_terminal: false
+
+  VERIFY_DEGREE:
+    name: VERIFY_DEGREE
+    description: "Confirm degree type and major"
+    transitions:
+      - trigger: degree_confirmed
+        target_state: VERIFY_DATES
+    data_points_to_collect:
+      - degree_type_confirmed
+      - major_confirmed
+    compliance_checkpoints: []
+    is_terminal: false
+
+  VERIFY_DATES:
+    name: VERIFY_DATES
+    description: "Confirm attendance and graduation dates"
+    transitions:
+      - trigger: dates_confirmed
+        target_state: CLOSING
+    data_points_to_collect:
+      - enrollment_date_confirmed
+      - graduation_date_confirmed
+    compliance_checkpoints: []
+    is_terminal: false
+
+  CLOSING:
+    name: CLOSING
+    description: "Thank the registrar and end the call"
+    transitions:
+      - trigger: call_complete
+        target_state: CALL_ENDED
+    data_points_to_collect: []
+    compliance_checkpoints: []
+    is_terminal: false
+
+  CALL_ENDED:
+    name: CALL_ENDED
+    description: "Terminal state"
+    transitions: []
+    data_points_to_collect: []
+    compliance_checkpoints: []
+    is_terminal: true
+
+  LEAVE_VOICEMAIL:
+    name: LEAVE_VOICEMAIL
+    description: "Leave voicemail requesting callback"
+    transitions: []
+    data_points_to_collect: []
+    compliance_checkpoints: []
+    is_terminal: true
+
+data_schema:
+  - field_name: institution_name_confirmed
+    type: string
+    required: true
+    description: "Institution name as confirmed"
+    pii_level: low
+
+  - field_name: degree_type_confirmed
+    type: string
+    required: true
+    description: "Degree type (BS, BA, MS, PhD, etc.)"
+    pii_level: low
+
+  - field_name: major_confirmed
+    type: string
+    required: false
+    description: "Major/field of study"
+    pii_level: low
+
+  - field_name: enrollment_date_confirmed
+    type: date
+    required: false
+    description: "Enrollment date as confirmed"
+    pii_level: medium
+
+  - field_name: graduation_date_confirmed
+    type: date
+    required: true
+    description: "Graduation date as confirmed"
+    pii_level: medium
+
+metadata:
+  created_by: "Chaitanya Rajkumar"
+  domain: "education_verification"
+  version_notes: "Skeleton for Phase 7 platform validation demo"

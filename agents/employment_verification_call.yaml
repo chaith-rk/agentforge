@@ -1,0 +1,432 @@
+agent_id: employment_verification_v1
+agent_name: "Employment Verification Agent"
+version: "1.0.0"
+description: >
+  AI voice agent that conducts outbound employment verification calls
+  following Vetty's standard verification workflow. Uses a confirm/deny
+  approach — reads back candidate's claimed details and asks the employer
+  to confirm each one.
+
+voice_config:
+  provider: vapi
+  voice_id: "" # TODO: Set after Vapi account setup — recommend a professional female voice
+  speed: 1.0
+  temperature: 0.3 # Low temperature for predictable, on-script behavior
+
+initial_state: GREETING
+
+system_prompt_template: "prompts/employment_verification_call.md"
+
+# --- Global Compliance Checkpoints ---
+# These are evaluated throughout the entire call
+compliance_checkpoints:
+  - name: never_disclose_requestor
+    description: "Agent must never reveal who requested the verification or what position the candidate is applying for"
+    validation_rule: never_disclose_requestor
+    failure_action: warn
+    error_message: "Potential disclosure of requesting party detected"
+
+  - name: accept_refusal_immediately
+    description: "Agent must immediately accept when a verifier refuses to share information — never push back"
+    validation_rule: accept_refusal_immediately
+    failure_action: warn
+    error_message: "Agent may be pushing back after a verifier refusal"
+
+# --- States ---
+states:
+  GREETING:
+    name: GREETING
+    description: "Open the call with Vetty's standard greeting including recorded line disclosure"
+    system_prompt_section: >
+      Open with: "Hi, my name is [agent_name]. I'm calling from Vetty on a
+      recorded line. This call is regarding employment verification of
+      [subject_name]. May I speak to an authorized person who can verify employment?"
+    transitions:
+      - trigger: verifier_available
+        target_state: IDENTIFY_VERIFIER
+      - trigger: can_help_directly
+        target_state: IDENTIFY_VERIFIER
+      - trigger: use_third_party
+        target_state: RECORD_REDIRECT
+      - trigger: no_record_initial
+        target_state: RECORD_NO_RECORD
+      - trigger: voicemail
+        target_state: LEAVE_VOICEMAIL
+      - trigger: refused
+        target_state: END_CALL_REFUSED
+      - trigger: dead_end
+        target_state: RECORD_DEAD_END
+    data_points_to_collect: []
+    compliance_checkpoints:
+      - name: recorded_line_disclosure
+        description: "Agent MUST mention 'recorded line' in the greeting — legal requirement"
+        validation_rule: recorded_line_disclosure
+        failure_action: block
+        error_message: "Cannot proceed without recorded line disclosure"
+    is_terminal: false
+
+  IDENTIFY_VERIFIER:
+    name: IDENTIFY_VERIFIER
+    description: "Collect the name and title of the person verifying employment"
+    system_prompt_section: >
+      Ask: "Thank you. May I have your name and title for our records?"
+    transitions:
+      - trigger: verifier_identified
+        target_state: VERIFY_COMPANY
+    data_points_to_collect:
+      - verifier_name
+      - verifier_title
+    compliance_checkpoints: []
+    is_terminal: false
+
+  VERIFY_COMPANY:
+    name: VERIFY_COMPANY
+    description: "Confirm the company name matches the candidate's claim"
+    system_prompt_section: >
+      Ask: "We have [subject_name] listed as having worked at [company_name].
+      Can you confirm this?"
+      If the employer gives a different name, record both. Note if it's a
+      subsidiary, parent company, rebrand, or staffing agency.
+    transitions:
+      - trigger: company_confirmed
+        target_state: VERIFY_TITLE
+      - trigger: company_discrepancy
+        target_state: VERIFY_TITLE
+      - trigger: no_record
+        target_state: RECORD_NO_RECORD
+      - trigger: limited_policy
+        target_state: VERIFY_TITLE
+    data_points_to_collect:
+      - company_name_confirmed
+      - company_name_match
+      - company_name_discrepancy_note
+    compliance_checkpoints: []
+    is_terminal: false
+
+  VERIFY_TITLE:
+    name: VERIFY_TITLE
+    description: "Confirm the job title matches the candidate's claim"
+    system_prompt_section: >
+      Ask: "We have their job title listed as [job_title]. Can you confirm?"
+      If different, record both versions without commenting on the discrepancy.
+    transitions:
+      - trigger: title_confirmed
+        target_state: VERIFY_DATES
+      - trigger: title_discrepancy
+        target_state: VERIFY_DATES
+      - trigger: title_refused
+        target_state: VERIFY_DATES
+    data_points_to_collect:
+      - job_title_confirmed
+      - job_title_match
+    compliance_checkpoints: []
+    is_terminal: false
+
+  VERIFY_DATES:
+    name: VERIFY_DATES
+    description: "Confirm employment dates match the candidate's claim"
+    system_prompt_section: >
+      Ask: "We have their employment dates as [start_date] to [end_date].
+      Can you confirm these dates?"
+      For currently employed: "We have them as currently employed since [start_date].
+      Can you confirm?"
+      Record even approximate dates ("around 2019") with low confidence.
+    transitions:
+      - trigger: dates_confirmed
+        target_state: VERIFY_EMPLOYMENT_STATUS
+      - trigger: dates_discrepancy
+        target_state: VERIFY_EMPLOYMENT_STATUS
+      - trigger: dates_refused
+        target_state: VERIFY_EMPLOYMENT_STATUS
+    data_points_to_collect:
+      - start_date_confirmed
+      - start_date_match
+      - end_date_confirmed
+      - end_date_match
+      - currently_employed
+    compliance_checkpoints: []
+    is_terminal: false
+
+  VERIFY_EMPLOYMENT_STATUS:
+    name: VERIFY_EMPLOYMENT_STATUS
+    description: "Confirm full-time, part-time, or contract status"
+    system_prompt_section: >
+      Ask: "Were they employed full-time, part-time, or on a contract basis?"
+    transitions:
+      - trigger: status_confirmed
+        target_state: VERIFY_LOCATION
+      - trigger: status_refused
+        target_state: VERIFY_LOCATION
+    data_points_to_collect:
+      - employment_status
+    compliance_checkpoints: []
+    is_terminal: false
+
+  VERIFY_LOCATION:
+    name: VERIFY_LOCATION
+    description: "Confirm the office/location where the candidate worked"
+    system_prompt_section: >
+      Ask: "Can you confirm the location or office where they were based?"
+    transitions:
+      - trigger: location_confirmed
+        target_state: VERIFY_REHIRE_ELIGIBILITY
+      - trigger: location_refused
+        target_state: VERIFY_REHIRE_ELIGIBILITY
+    data_points_to_collect:
+      - location_confirmed
+    compliance_checkpoints: []
+    is_terminal: false
+
+  VERIFY_REHIRE_ELIGIBILITY:
+    name: VERIFY_REHIRE_ELIGIBILITY
+    description: "Ask about rehire eligibility — most commonly refused question"
+    system_prompt_section: >
+      Ask: "Would [subject_name] be eligible for rehire?"
+      This is the most commonly refused question. Accept refusal IMMEDIATELY.
+      Do not ask a follow-up or rephrase.
+    transitions:
+      - trigger: rehire_answered
+        target_state: CLOSING
+      - trigger: rehire_refused
+        target_state: CLOSING
+    data_points_to_collect:
+      - eligible_for_rehire
+    compliance_checkpoints: []
+    is_terminal: false
+
+  CLOSING:
+    name: CLOSING
+    description: "Thank the verifier and collect optional callback number"
+    system_prompt_section: >
+      Say: "That's all the information I needed. Thank you so much for your time.
+      If we need any follow-up, is there a direct number we can reach you at?"
+      Collect callback number if offered, then: "Thank you. Have a great day."
+    transitions:
+      - trigger: call_complete
+        target_state: CALL_ENDED
+    data_points_to_collect:
+      - callback_number
+    compliance_checkpoints: []
+    is_terminal: false
+
+  CALL_ENDED:
+    name: CALL_ENDED
+    description: "Terminal state — call has ended successfully"
+    transitions: []
+    data_points_to_collect: []
+    compliance_checkpoints: []
+    is_terminal: true
+
+  # --- Edge Case States ---
+
+  RECORD_REDIRECT:
+    name: RECORD_REDIRECT
+    description: "Employer uses a third-party verification service"
+    system_prompt_section: >
+      Ask: "I understand. Could you tell me which service you use for
+      employment verifications?"
+      Collect service name, thank them, end call.
+    transitions:
+      - trigger: redirect_recorded
+        target_state: REDIRECT_ENDED
+    data_points_to_collect:
+      - third_party_redirect
+    compliance_checkpoints: []
+    is_terminal: false
+
+  REDIRECT_ENDED:
+    name: REDIRECT_ENDED
+    description: "Terminal state — redirected to third-party service"
+    transitions: []
+    data_points_to_collect: []
+    compliance_checkpoints: []
+    is_terminal: true
+
+  RECORD_NO_RECORD:
+    name: RECORD_NO_RECORD
+    description: "Employer has no record of the candidate"
+    system_prompt_section: >
+      Say: "Just to confirm, I'm looking for [subject_name]. They listed
+      [company_name] at [company_address] as their employer. Is it possible
+      they may be listed under a different name or at a different location?"
+      If still no record, accept and end. If they suggest trying elsewhere, note it.
+    transitions:
+      - trigger: confirmed_no_record
+        target_state: NO_RECORD_ENDED
+      - trigger: try_other_department
+        target_state: NO_RECORD_ENDED
+    data_points_to_collect:
+      - no_record
+    compliance_checkpoints: []
+    is_terminal: false
+
+  NO_RECORD_ENDED:
+    name: NO_RECORD_ENDED
+    description: "Terminal state — no record found"
+    transitions: []
+    data_points_to_collect: []
+    compliance_checkpoints: []
+    is_terminal: true
+
+  RECORD_DEAD_END:
+    name: RECORD_DEAD_END
+    description: "Business closed, number disconnected, or wrong number"
+    transitions: []
+    data_points_to_collect: []
+    compliance_checkpoints: []
+    is_terminal: true
+
+  LEAVE_VOICEMAIL:
+    name: LEAVE_VOICEMAIL
+    description: "Leave a voicemail requesting callback"
+    system_prompt_section: >
+      Say: "Hi, this is [agent_name] calling from Vetty regarding an
+      employment verification. Could you please return my call at
+      [callback_number]? Thank you."
+    transitions: []
+    data_points_to_collect: []
+    compliance_checkpoints: []
+    is_terminal: true
+
+  END_CALL_REFUSED:
+    name: END_CALL_REFUSED
+    description: "Verifier refuses to participate or is hostile"
+    system_prompt_section: >
+      Say: "I understand. Thank you for your time."
+      End the call immediately. Do not attempt to persuade.
+    transitions: []
+    data_points_to_collect: []
+    compliance_checkpoints: []
+    is_terminal: true
+
+# --- Data Schema ---
+# All fields the agent can collect during a verification call
+data_schema:
+  - field_name: verifier_name
+    type: string
+    required: true
+    description: "Name of the person who verified employment"
+    pii_level: medium
+
+  - field_name: verifier_title
+    type: string
+    required: false
+    description: "Title/role of the verifier"
+    pii_level: low
+
+  - field_name: company_name_confirmed
+    type: string
+    required: true
+    description: "Company name as confirmed by employer"
+    pii_level: low
+
+  - field_name: company_name_match
+    type: boolean
+    required: true
+    description: "Whether employer's company name matches candidate's claim"
+    pii_level: none
+
+  - field_name: company_name_discrepancy_note
+    type: string
+    required: false
+    description: "Explanation if company name differs (subsidiary, rebrand, staffing agency)"
+    pii_level: none
+
+  - field_name: job_title_confirmed
+    type: string
+    required: true
+    description: "Job title as confirmed by employer"
+    pii_level: low
+
+  - field_name: job_title_match
+    type: boolean
+    required: true
+    description: "Whether employer's title matches candidate's claim"
+    pii_level: none
+
+  - field_name: start_date_confirmed
+    type: date
+    required: true
+    description: "Start date as confirmed by employer"
+    pii_level: medium
+
+  - field_name: start_date_match
+    type: boolean
+    required: true
+    description: "Whether start date matches candidate's claim"
+    pii_level: none
+
+  - field_name: end_date_confirmed
+    type: date
+    required: false
+    description: "End date as confirmed by employer (null if currently employed)"
+    pii_level: medium
+
+  - field_name: end_date_match
+    type: boolean
+    required: false
+    description: "Whether end date matches candidate's claim"
+    pii_level: none
+
+  - field_name: currently_employed
+    type: boolean
+    required: true
+    description: "Whether the subject is still employed at the company"
+    pii_level: none
+
+  - field_name: employment_status
+    type: enum
+    required: false
+    enum_values: ["full-time", "part-time", "contract", "temporary", "intern"]
+    description: "Employment type"
+    pii_level: none
+
+  - field_name: location_confirmed
+    type: string
+    required: false
+    description: "Office/location where subject worked"
+    pii_level: low
+
+  - field_name: eligible_for_rehire
+    type: boolean
+    required: false
+    description: "Would employer rehire the candidate (often refused)"
+    pii_level: none
+
+  - field_name: callback_number
+    type: string
+    required: false
+    description: "Direct number for follow-up calls"
+    pii_level: medium
+
+  - field_name: third_party_redirect
+    type: string
+    required: false
+    description: "Third-party verification service name if redirected"
+    pii_level: none
+
+  - field_name: no_record
+    type: boolean
+    required: false
+    description: "Employer has no record of the candidate"
+    pii_level: none
+
+  - field_name: call_outcome
+    type: enum
+    required: true
+    enum_values: ["completed", "redirected", "no_record", "voicemail", "refused", "dead_end"]
+    description: "Final call outcome"
+    pii_level: none
+
+  - field_name: confidence
+    type: enum
+    required: true
+    enum_values: ["high", "medium", "low"]
+    description: "Confidence in the collected data"
+    pii_level: none
+
+metadata:
+  created_by: "Chaitanya Rajkumar"
+  based_on: "Prashant Singh operational workflow"
+  domain: "employment_verification"
+  version_notes: "Initial POC based on Prashant's verification script"
