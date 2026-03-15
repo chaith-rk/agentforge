@@ -1,10 +1,14 @@
 # Progress Tracker — Vetty Voice AI Platform
 
-**Last Updated:** 2026-03-14
+**Last Updated:** 2026-03-15
 
 ## Current Status
 
-**Phase 1 complete. Phase 2 in progress.** Vapi validated — real phone calls working from backend. Next: load the employment verification prompt and test the actual verification conversation.
+**Phase 1 complete. Phases 2-4 are partially validated.** Real phone calls are
+working from the backend, ngrok webhook delivery has been validated locally,
+and the call initiation API now supports per-call assistant overrides for demo
+assistants. Remaining gap: transcript/tool-call webhook persistence still needs
+verification against real Vapi payloads.
 
 ---
 
@@ -43,16 +47,17 @@
 ---
 
 ## Phase 3: Vapi Assistant + Calling
-**Status:** 🔲 Not Started
+**Status:** 🟡 In Progress
 **Target:** Day 3–5
 
 - [ ] Create employment verification assistant in Vapi dashboard
 - [ ] Set system prompt from `prompts/employment_verification_call.md`
 - [ ] Register function/tool calls in Vapi (record_data_point, etc.)
 - [ ] Configure voice (professional, moderate pace, clear diction)
-- [ ] Configure webhook URL (ngrok → local FastAPI)
-- [ ] Follow `docs/VAPI_SETUP.md` for auth configuration
-- [ ] Make test calls, iterate on prompt
+- [x] Configure webhook URL (ngrok → local FastAPI)
+- [x] Follow `docs/VAPI_SETUP.md` for auth configuration
+- [x] Make test calls, iterate on prompt
+- [x] Support one-off assistant selection via `assistant_id` request override
 - [ ] Test: Does it follow Prashant's script?
 - [ ] Test: Does it read back candidate details correctly?
 - [ ] Test: Does it handle "I can only confirm dates and title"?
@@ -81,7 +86,9 @@
 - [ ] Wire webhook events to data recorder
 - [ ] Wire events to WebSocket broadcast
 - [ ] End-to-end test: trigger call → conversation → data extracted → record generated
-- [ ] Configure ngrok for development
+- [x] Configure ngrok for development
+- [x] Validate local webhook auth mismatch and restart flow
+- [ ] Confirm transcript/tool-call events persist from production Vapi payloads
 
 **Success criteria:** Complete call produces a structured verification record with audit trail.
 

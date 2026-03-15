@@ -80,6 +80,37 @@ ngrok http 8000
 # Copy the HTTPS URL and configure it as your Vapi webhook endpoint
 ```
 
+## Current Vapi Runtime Behavior
+
+- Live call persona, first message, and script currently come from the Vapi
+  assistant configured in Vapi's dashboard, not from `prompts/*.md` in this
+  repo.
+- This backend does not yet build the assistant dynamically. It triggers Vapi
+  with an `assistantId` and then processes webhook events from
+  `/webhooks/vapi`.
+- `VAPI_ASSISTANT_ID` is the default assistant, but `/api/calls/initiate`
+  now accepts an optional `assistant_id` field so you can test a different
+  assistant for a single call without editing `.env`.
+- If `VAPI_WEBHOOK_SECRET` is blank, leave Vapi server auth off. If you change
+  `.env`, restart `uvicorn` so the running process reloads the new values.
+
+Example one-off call using a different Vapi assistant:
+
+```bash
+set -a; source .env; set +a
+curl -X POST http://localhost:8000/api/calls/initiate \
+  -H 'Content-Type: application/json' \
+  -H "X-API-Key: $API_KEY" \
+  -d '{
+    "assistant_id": "your-vapi-assistant-id",
+    "subject_name": "Jane Doe",
+    "company_name": "Acme Inc",
+    "company_phone": "+15551234567",
+    "job_title": "Software Engineer",
+    "start_date": "2022-01-01"
+  }'
+```
+
 ## Project Structure
 
 ```

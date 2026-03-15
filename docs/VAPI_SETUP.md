@@ -14,14 +14,17 @@ Set these values in `.env`:
 
 ```bash
 VAPI_API_KEY=<your_vapi_private_key>
-VAPI_WEBHOOK_SECRET=<shared_secret_for_webhooks>
+VAPI_WEBHOOK_SECRET=<shared_secret_for_webhooks_or_leave_blank>
 VAPI_ASSISTANT_ID=<asst_xxx>
 VAPI_PHONE_NUMBER_ID=<pn_xxx>
 ```
 
 Notes:
 - `VAPI_API_KEY` must be your **private** key (server-side).
-- `VAPI_WEBHOOK_SECRET` must exactly match what you configure in Vapi credential auth.
+- `VAPI_WEBHOOK_SECRET` is optional for local testing. If it is blank, leave
+  Vapi server auth off.
+- If you change `.env`, restart the app so the running process reloads the
+  updated settings.
 
 ## 2. Run app + tunnel
 
@@ -47,35 +50,48 @@ https://abc123.ngrok-free.app/webhooks/vapi
 
 ## 3. Configure webhook auth in Vapi
 
+Only do this if `VAPI_WEBHOOK_SECRET` is non-empty.
+
 In Vapi dashboard:
 
-1. Go to `Settings -> Credentials`.
-2. Create a new credential for server URL auth.
+1. Open the area where Vapi manages custom/server credentials.
+2. Create a credential for server URL auth.
 3. Choose one of these auth options:
    - Shared secret header: `x-vapi-secret`
    - Bearer token header: `Authorization: Bearer <secret>`
 4. Use the exact same secret value as `VAPI_WEBHOOK_SECRET` in `.env`.
-5. Save and note the credential id (e.g. `cred_xxx`).
+5. Save it and attach it to the assistant server settings.
 
 Compatibility in this backend:
 - Accepts `x-vapi-signature` (legacy HMAC), `x-vapi-secret`, or `Authorization: Bearer ...`.
+
+If `VAPI_WEBHOOK_SECRET` is blank:
+- Leave Vapi auth as `No authentication`
+- Do not attach a credential
 
 ## 4. Configure assistant server URL
 
 In Vapi dashboard:
 
 1. Open your target assistant.
-2. Go to `Advanced` settings.
+2. Go to the assistant's messaging/server settings.
 3. Set `Server URL` to:
    - `https://<your-ngrok-domain>/webhooks/vapi`
-4. Attach the credential created in step 3.
+4. Attach the credential from step 3 only if webhook auth is enabled.
 5. Save assistant.
+
+Important:
+- The live script, persona, `firstMessage`, and voicemail message come from the
+  Vapi assistant you select here.
+- This backend currently does not serve the prompt dynamically; it only starts
+  a call with an assistant ID and processes the resulting webhooks.
 
 ## 5. Enable server messages/events
 
 Ensure assistant server messages include at least:
 - `assistant-request`
 - `status-update`
+- `speech-update`
 - `transcript`
 - `end-of-call-report`
 - `function-call` (legacy)
@@ -108,6 +124,7 @@ Once Vapi is configured, initiate a call and verify logs include:
 If you see `Invalid webhook authentication`:
 - re-check secret value in both Vapi credential and `.env`
 - ensure assistant is attached to the correct credential
+- if you recently changed `.env`, restart `uvicorn`
 - confirm ngrok URL is current (it changes each run unless reserved)
 
 ## 8. Trigger call from this backend
@@ -135,6 +152,12 @@ curl -X POST http://localhost:8000/api/calls/initiate \
 Expected response:
 - `status: initiated`
 - non-empty `vapi_call_id`
+
+Optional:
+- Include `"assistant_id": "<vapi_assistant_id>"` in the request body to override
+  `VAPI_ASSISTANT_ID` for a single call without editing `.env`.
+- Use this for one-off demo assistants so you do not have to keep swapping the
+  default assistant in `.env`.
 
 ## Security
 

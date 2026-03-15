@@ -40,6 +40,10 @@ class InitiateCallRequest(BaseModel):
         default="employment_verification_v1",
         description="Which agent type to use",
     )
+    assistant_id: str = Field(
+        default="",
+        description="Optional Vapi assistant override for this specific call",
+    )
     subject_name: str = Field(..., description="Candidate's full name")
     company_name: str = Field(..., description="Company to verify against")
     company_phone: str = Field(..., description="Phone number to call (E.164)")
@@ -84,19 +88,21 @@ async def initiate_call(request: InitiateCallRequest) -> CallResponse:
     the outbound call via Vapi.
     """
     session_id = str(uuid.uuid4())
+    selected_assistant_id = request.assistant_id or settings.vapi_assistant_id
 
-    if not settings.vapi_api_key or not settings.vapi_assistant_id or not settings.vapi_phone_number_id:
+    if not settings.vapi_api_key or not selected_assistant_id or not settings.vapi_phone_number_id:
         logger.warning(
             "vapi_config_missing",
             has_api_key=bool(settings.vapi_api_key),
-            has_assistant_id=bool(settings.vapi_assistant_id),
+            has_assistant_id=bool(selected_assistant_id),
             has_phone_number_id=bool(settings.vapi_phone_number_id),
         )
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=(
                 "Vapi is not fully configured. Set VAPI_API_KEY, "
-                "VAPI_ASSISTANT_ID, and VAPI_PHONE_NUMBER_ID."
+                "VAPI_PHONE_NUMBER_ID, and either VAPI_ASSISTANT_ID "
+                "or assistant_id in the request."
             ),
         )
 
@@ -119,13 +125,14 @@ async def initiate_call(request: InitiateCallRequest) -> CallResponse:
         "agent_config_id": request.agent_config_id,
         "subject_name": request.subject_name,
         "company_name": request.company_name,
+        "assistant_id": selected_assistant_id,
     }
 
     try:
         async with VapiClient() as vapi_client:
             vapi_response = await vapi_client.create_call(
                 to_number=request.company_phone,
-                assistant_id=settings.vapi_assistant_id,
+                assistant_id=selected_assistant_id,
                 phone_number_id=settings.vapi_phone_number_id,
                 metadata=metadata,
             )
@@ -153,6 +160,7 @@ async def initiate_call(request: InitiateCallRequest) -> CallResponse:
         session_id=session_id,
         agent_config_id=request.agent_config_id,
         company_name=request.company_name,
+        assistant_id=selected_assistant_id,
         vapi_call_id=vapi_call_id,
     )
 
