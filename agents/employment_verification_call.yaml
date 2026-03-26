@@ -307,72 +307,91 @@ data_schema:
     required: true
     description: "Name of the person who verified employment"
     pii_level: medium
+    display_name: "Verifier Name"
+    question: "Thank you for taking my call. May I have your name for our records?"
 
   - field_name: verifier_title
     type: string
     required: false
     description: "Title/role of the verifier"
     pii_level: low
+    display_name: "Verifier Title"
+    question: "And your title or role?"
 
   - field_name: company_name_confirmed
     type: string
     required: true
     description: "Company name as confirmed by employer"
     pii_level: low
+    display_name: "Company Name (Confirmed)"
+    question: "We have {{subject_name}} listed as having worked at {{employer_company_name}}. Can you confirm this?"
 
   - field_name: company_name_match
     type: boolean
     required: true
     description: "Whether employer's company name matches candidate's claim"
     pii_level: none
+    display_name: "Company Name Match"
 
   - field_name: company_name_discrepancy_note
     type: string
     required: false
     description: "Explanation if company name differs (subsidiary, rebrand, staffing agency)"
     pii_level: none
+    display_name: "Company Name Discrepancy Note"
 
   - field_name: job_title_confirmed
     type: string
     required: true
     description: "Job title as confirmed by employer"
     pii_level: low
+    display_name: "Job Title (Confirmed)"
+    question: "We have their job title listed as {{position}}. Can you confirm?"
 
   - field_name: job_title_match
     type: boolean
     required: true
     description: "Whether employer's title matches candidate's claim"
     pii_level: none
+    display_name: "Job Title Match"
 
   - field_name: start_date_confirmed
     type: date
     required: true
     description: "Start date as confirmed by employer"
     pii_level: medium
+    display_name: "Start Date (Confirmed)"
+    question: "We have their start date as {{month_started}} {{year_started}}. Can you confirm?"
 
   - field_name: start_date_match
     type: boolean
     required: true
     description: "Whether start date matches candidate's claim"
     pii_level: none
+    display_name: "Start Date Match"
 
   - field_name: end_date_confirmed
     type: date
     required: false
     description: "End date as confirmed by employer (null if currently employed)"
     pii_level: medium
+    display_name: "End Date (Confirmed)"
+    question: "We have their end date as {{month_ended}} {{year_ended}}. Can you confirm?"
 
   - field_name: end_date_match
     type: boolean
     required: false
     description: "Whether end date matches candidate's claim"
     pii_level: none
+    display_name: "End Date Match"
 
   - field_name: currently_employed
     type: boolean
     required: true
     description: "Whether the subject is still employed at the company"
     pii_level: none
+    display_name: "Currently Employed"
+    question: "Are they still currently employed at your organization?"
 
   - field_name: employment_status
     type: enum
@@ -380,36 +399,46 @@ data_schema:
     enum_values: ["full-time", "part-time", "contract", "temporary", "intern"]
     description: "Employment type"
     pii_level: none
+    display_name: "Employment Type"
+    question: "Were they employed full-time, part-time, or on a contract basis?"
 
   - field_name: location_confirmed
     type: string
     required: false
     description: "Office/location where subject worked"
     pii_level: low
+    display_name: "Work Location"
+    question: "Can you confirm the office or location where they were based?"
 
   - field_name: eligible_for_rehire
     type: boolean
     required: false
     description: "Would employer rehire the candidate (often refused)"
     pii_level: none
+    display_name: "Eligible for Rehire"
+    question: "Would {{subject_name}} be eligible for rehire?"
 
   - field_name: callback_number
     type: string
     required: false
     description: "Direct number for follow-up calls"
     pii_level: medium
+    display_name: "Callback Number"
+    question: "In case we need any follow-up, is there a direct number we can reach you at?"
 
   - field_name: third_party_redirect
     type: string
     required: false
     description: "Third-party verification service name if redirected"
     pii_level: none
+    display_name: "Third-Party Service"
 
   - field_name: no_record
     type: boolean
     required: false
     description: "Employer has no record of the candidate"
     pii_level: none
+    display_name: "No Record Found"
 
   - field_name: call_outcome
     type: enum
@@ -417,6 +446,7 @@ data_schema:
     enum_values: ["completed", "redirected", "no_record", "voicemail", "refused", "dead_end"]
     description: "Final call outcome"
     pii_level: none
+    display_name: "Call Outcome"
 
   - field_name: confidence
     type: enum
@@ -424,6 +454,7 @@ data_schema:
     enum_values: ["high", "medium", "low"]
     description: "Confidence in the collected data"
     pii_level: none
+    display_name: "Confidence Level"
 
 metadata:
   created_by: "Chaitanya Rajkumar"

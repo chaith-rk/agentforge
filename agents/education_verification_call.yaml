@@ -30,11 +30,24 @@ states:
   GREETING:
     name: GREETING
     description: "Open the call with recorded line disclosure"
+    system_prompt_section: >
+      Open with: "Hi, my name is [agent_name]. I'm calling from Vetty on a
+      recorded line. This call is regarding education verification of
+      [subject_name]. May I speak to someone in the registrar's office who can
+      verify enrollment and degree records?"
     transitions:
       - trigger: registrar_available
-        target_state: VERIFY_INSTITUTION
+        target_state: IDENTIFY_REGISTRAR
+      - trigger: use_third_party
+        target_state: RECORD_REDIRECT
+      - trigger: no_record_initial
+        target_state: RECORD_NO_RECORD
       - trigger: voicemail
         target_state: LEAVE_VOICEMAIL
+      - trigger: refused
+        target_state: END_CALL_REFUSED
+      - trigger: dead_end
+        target_state: RECORD_DEAD_END
     data_points_to_collect: []
     compliance_checkpoints:
       - name: recorded_line_disclosure
@@ -44,54 +57,165 @@ states:
         error_message: "Recorded line disclosure required"
     is_terminal: false
 
+  IDENTIFY_REGISTRAR:
+    name: IDENTIFY_REGISTRAR
+    description: "Collect the name and title of the registrar representative"
+    system_prompt_section: >
+      Ask: "Thank you. May I have your name and title for our records?"
+    transitions:
+      - trigger: registrar_identified
+        target_state: VERIFY_INSTITUTION
+    data_points_to_collect:
+      - registrar_name
+      - registrar_title
+    compliance_checkpoints: []
+    is_terminal: false
+
   VERIFY_INSTITUTION:
     name: VERIFY_INSTITUTION
-    description: "Confirm the institution name"
+    description: "Confirm the institution name matches the candidate's claim"
+    system_prompt_section: >
+      Ask: "We have [subject_name] listed as having attended [institution_name].
+      Can you confirm this?"
+      If the institution gives a slightly different name (e.g., official vs. common
+      name), record both without commenting.
     transitions:
       - trigger: institution_confirmed
         target_state: VERIFY_DEGREE
+      - trigger: institution_discrepancy
+        target_state: VERIFY_DEGREE
+      - trigger: no_record
+        target_state: RECORD_NO_RECORD
     data_points_to_collect:
       - institution_name_confirmed
+      - institution_name_match
     compliance_checkpoints: []
     is_terminal: false
 
   VERIFY_DEGREE:
     name: VERIFY_DEGREE
-    description: "Confirm degree type and major"
+    description: "Confirm degree type, major, and whether it was awarded"
+    system_prompt_section: >
+      Ask: "We have them listed as having earned a [degree_type] in [major].
+      Can you confirm the degree type and field of study?"
+      Then: "Can you confirm that the degree was awarded and conferred?"
+      Record both the degree type and whether it was awarded.
     transitions:
       - trigger: degree_confirmed
         target_state: VERIFY_DATES
+      - trigger: degree_discrepancy
+        target_state: VERIFY_DATES
+      - trigger: degree_refused
+        target_state: VERIFY_DATES
     data_points_to_collect:
       - degree_type_confirmed
+      - degree_type_match
       - major_confirmed
+      - major_match
+      - degree_awarded
     compliance_checkpoints: []
     is_terminal: false
 
   VERIFY_DATES:
     name: VERIFY_DATES
-    description: "Confirm attendance and graduation dates"
+    description: "Confirm enrollment and graduation dates"
+    system_prompt_section: >
+      Ask: "We have their enrollment start date as [enrollment_date] and
+      graduation date as [graduation_date]. Can you confirm these dates?"
+      Also ask: "Were they enrolled full-time or part-time?"
+      Record even approximate dates with low confidence.
     transitions:
       - trigger: dates_confirmed
         target_state: CLOSING
+      - trigger: dates_discrepancy
+        target_state: CLOSING
+      - trigger: dates_refused
+        target_state: CLOSING
     data_points_to_collect:
       - enrollment_date_confirmed
+      - enrollment_date_match
       - graduation_date_confirmed
+      - graduation_date_match
+      - enrollment_status
     compliance_checkpoints: []
     is_terminal: false
 
   CLOSING:
     name: CLOSING
-    description: "Thank the registrar and end the call"
+    description: "Thank the registrar and collect optional callback number"
+    system_prompt_section: >
+      Say: "That's all the information I needed. Thank you so much for your time.
+      If we need any follow-up, is there a direct number we can reach you at?"
+      Collect callback number if offered, then: "Thank you. Have a great day."
     transitions:
       - trigger: call_complete
         target_state: CALL_ENDED
-    data_points_to_collect: []
+    data_points_to_collect:
+      - callback_number
     compliance_checkpoints: []
     is_terminal: false
 
   CALL_ENDED:
     name: CALL_ENDED
-    description: "Terminal state"
+    description: "Terminal state — call has ended successfully"
+    transitions: []
+    data_points_to_collect: []
+    compliance_checkpoints: []
+    is_terminal: true
+
+  RECORD_REDIRECT:
+    name: RECORD_REDIRECT
+    description: "Institution uses a third-party verification service (e.g., National Student Clearinghouse)"
+    system_prompt_section: >
+      Ask: "I understand. Could you tell me which service you use for
+      education verifications?"
+      Collect service name, thank them, end call.
+    transitions:
+      - trigger: redirect_recorded
+        target_state: REDIRECT_ENDED
+    data_points_to_collect:
+      - third_party_redirect
+    compliance_checkpoints: []
+    is_terminal: false
+
+  REDIRECT_ENDED:
+    name: REDIRECT_ENDED
+    description: "Terminal state — redirected to third-party service"
+    transitions: []
+    data_points_to_collect: []
+    compliance_checkpoints: []
+    is_terminal: true
+
+  RECORD_NO_RECORD:
+    name: RECORD_NO_RECORD
+    description: "Institution has no record of the candidate"
+    system_prompt_section: >
+      Say: "Just to confirm, I'm looking for [subject_name]. They listed
+      [institution_name] as the institution where they earned their [degree_type].
+      Is it possible they may be listed under a different name or in a different
+      records system?"
+      If still no record, accept and end. Note any suggestions.
+    transitions:
+      - trigger: confirmed_no_record
+        target_state: NO_RECORD_ENDED
+      - trigger: try_other_department
+        target_state: NO_RECORD_ENDED
+    data_points_to_collect:
+      - no_record
+    compliance_checkpoints: []
+    is_terminal: false
+
+  NO_RECORD_ENDED:
+    name: NO_RECORD_ENDED
+    description: "Terminal state — no record found"
+    transitions: []
+    data_points_to_collect: []
+    compliance_checkpoints: []
+    is_terminal: true
+
+  RECORD_DEAD_END:
+    name: RECORD_DEAD_END
+    description: "Institution unreachable, number disconnected, or wrong number"
     transitions: []
     data_points_to_collect: []
     compliance_checkpoints: []
@@ -99,42 +223,173 @@ states:
 
   LEAVE_VOICEMAIL:
     name: LEAVE_VOICEMAIL
-    description: "Leave voicemail requesting callback"
+    description: "Leave a voicemail requesting callback"
+    system_prompt_section: >
+      Say: "Hi, this is [agent_name] calling from Vetty regarding an
+      education verification. Could you please return my call at
+      [callback_number]? Thank you."
+    transitions: []
+    data_points_to_collect: []
+    compliance_checkpoints: []
+    is_terminal: true
+
+  END_CALL_REFUSED:
+    name: END_CALL_REFUSED
+    description: "Registrar refuses to participate or is hostile"
+    system_prompt_section: >
+      Say: "I understand. Thank you for your time."
+      End the call immediately. Do not attempt to persuade.
     transitions: []
     data_points_to_collect: []
     compliance_checkpoints: []
     is_terminal: true
 
 data_schema:
+  - field_name: registrar_name
+    type: string
+    required: true
+    description: "Name of the registrar or records office representative"
+    pii_level: medium
+    display_name: "Registrar Name"
+    question: "Thank you for taking my call. May I have your name for our records?"
+
+  - field_name: registrar_title
+    type: string
+    required: false
+    description: "Title/role of the registrar representative"
+    pii_level: low
+    display_name: "Registrar Title"
+    question: "And your title or role within the registrar's office?"
+
   - field_name: institution_name_confirmed
     type: string
     required: true
-    description: "Institution name as confirmed"
+    description: "Institution name as confirmed by the registrar"
     pii_level: low
+    display_name: "Institution Name (Confirmed)"
+    question: "We have {{subject_name}} listed as having attended {{institution_name}}. Can you confirm this?"
+
+  - field_name: institution_name_match
+    type: boolean
+    required: true
+    description: "Whether the confirmed institution name matches the candidate's claim"
+    pii_level: none
+    display_name: "Institution Name Match"
 
   - field_name: degree_type_confirmed
     type: string
     required: true
-    description: "Degree type (BS, BA, MS, PhD, etc.)"
+    description: "Degree type as confirmed by the registrar (BS, BA, MS, PhD, etc.)"
     pii_level: low
+    display_name: "Degree Type (Confirmed)"
+    question: "We have them listed as having earned a {{degree_type}}. Can you confirm the degree type?"
+
+  - field_name: degree_type_match
+    type: boolean
+    required: true
+    description: "Whether the confirmed degree type matches the candidate's claim"
+    pii_level: none
+    display_name: "Degree Type Match"
 
   - field_name: major_confirmed
     type: string
     required: false
-    description: "Major/field of study"
+    description: "Major/field of study as confirmed by the registrar"
     pii_level: low
+    display_name: "Major (Confirmed)"
+    question: "We have their major listed as {{major}}. Can you confirm?"
+
+  - field_name: major_match
+    type: boolean
+    required: false
+    description: "Whether the confirmed major matches the candidate's claim"
+    pii_level: none
+    display_name: "Major Match"
 
   - field_name: enrollment_date_confirmed
     type: date
     required: false
-    description: "Enrollment date as confirmed"
+    description: "Enrollment start date as confirmed by the registrar"
     pii_level: medium
+    display_name: "Enrollment Date (Confirmed)"
+    question: "We have their enrollment start date as {{month_enrolled}} {{year_enrolled}}. Can you confirm?"
+
+  - field_name: enrollment_date_match
+    type: boolean
+    required: false
+    description: "Whether the confirmed enrollment date matches the candidate's claim"
+    pii_level: none
+    display_name: "Enrollment Date Match"
 
   - field_name: graduation_date_confirmed
     type: date
     required: true
-    description: "Graduation date as confirmed"
+    description: "Graduation date as confirmed by the registrar"
     pii_level: medium
+    display_name: "Graduation Date (Confirmed)"
+    question: "We have their graduation date as {{month_graduated}} {{year_graduated}}. Can you confirm?"
+
+  - field_name: graduation_date_match
+    type: boolean
+    required: true
+    description: "Whether the confirmed graduation date matches the candidate's claim"
+    pii_level: none
+    display_name: "Graduation Date Match"
+
+  - field_name: enrollment_status
+    type: enum
+    required: false
+    enum_values: ["full-time", "part-time"]
+    description: "Whether the candidate attended full-time or part-time"
+    pii_level: none
+    display_name: "Enrollment Status"
+    question: "Were they enrolled full-time or part-time?"
+
+  - field_name: degree_awarded
+    type: boolean
+    required: true
+    description: "Whether the degree was actually awarded (vs. attended but did not graduate)"
+    pii_level: none
+    display_name: "Degree Awarded"
+    question: "Can you confirm that the degree was awarded and conferred?"
+
+  - field_name: callback_number
+    type: string
+    required: false
+    description: "Direct number for follow-up calls with the registrar"
+    pii_level: medium
+    display_name: "Callback Number"
+    question: "In case we need any follow-up, is there a direct number we can reach you at?"
+
+  - field_name: third_party_redirect
+    type: string
+    required: false
+    description: "Third-party verification service name if redirected (e.g., National Student Clearinghouse)"
+    pii_level: none
+    display_name: "Third-Party Service"
+
+  - field_name: no_record
+    type: boolean
+    required: false
+    description: "Institution has no record of the candidate"
+    pii_level: none
+    display_name: "No Record Found"
+
+  - field_name: call_outcome
+    type: enum
+    required: true
+    enum_values: ["completed", "redirected", "no_record", "voicemail", "refused", "dead_end"]
+    description: "Final call outcome"
+    pii_level: none
+    display_name: "Call Outcome"
+
+  - field_name: confidence
+    type: enum
+    required: true
+    enum_values: ["high", "medium", "low"]
+    description: "Confidence in the collected data"
+    pii_level: none
+    display_name: "Confidence Level"
 
 metadata:
   created_by: "Chaitanya Rajkumar"
