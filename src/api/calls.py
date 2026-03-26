@@ -225,6 +225,42 @@ async def get_verification_record(session_id: str) -> dict[str, Any]:
     return session
 
 
+@router.get("/{session_id}/result")
+async def get_call_result(session_id: str) -> dict[str, Any]:
+    """Get structured verification result in side-by-side format.
+
+    For active calls, returns a partial result from the in-memory state.
+    For completed calls, returns the snapshot stored at call completion.
+
+    Args:
+        session_id: The call session ID.
+
+    Raises:
+        HTTPException 404: If no session with the given ID exists.
+    """
+    cm = _get_call_manager()
+
+    # Check active call first — return partial result
+    active = cm.get_active_call(session_id)
+    if active:
+        record = cm._build_verification_record(active)
+        result = record.to_report_dict()
+        result["status"] = "in_progress"
+        return result
+
+    # Fall back to snapshot stored at call completion
+    from src.main import event_store
+
+    session = await event_store.get_session(session_id)
+    if not session:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Session {session_id} not found",
+        )
+
+    return session
+
+
 @router.get("")
 async def list_calls(
     limit: int = 50,

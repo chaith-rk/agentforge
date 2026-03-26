@@ -239,3 +239,61 @@ class EventStore:
             (session_id, json.dumps(snapshot_data)),
         )
         await self._db.commit()
+
+    async def get_stats(self) -> dict[str, Any]:
+        """Get aggregate call statistics from the sessions table.
+
+        Returns a dict with keys: total, outcomes, calls_today, calls_this_week,
+        success_rate, avg_duration.
+        """
+        async with aiosqlite.connect(self._db_path) as db:
+            async with db.execute("SELECT COUNT(*) FROM call_sessions") as cursor:
+                row = await cursor.fetchone()
+                total: int = row[0] if row else 0
+
+            async with db.execute(
+                "SELECT status, COUNT(*) FROM call_sessions GROUP BY status"
+            ) as cursor:
+                rows = await cursor.fetchall()
+                outcomes: dict[str, int] = {r[0]: r[1] for r in rows}
+
+            async with db.execute(
+                "SELECT COUNT(*) FROM call_sessions WHERE date(created_at) = date('now')"
+            ) as cursor:
+                row = await cursor.fetchone()
+                calls_today: int = row[0] if row else 0
+
+            async with db.execute(
+                "SELECT COUNT(*) FROM call_sessions WHERE created_at >= datetime('now', '-7 days')"
+            ) as cursor:
+                row = await cursor.fetchone()
+                calls_this_week: int = row[0] if row else 0
+
+            completed_count = outcomes.get("completed", 0)
+            success_rate: float = (completed_count / total) if total > 0 else 0.0
+
+            async with db.execute(
+                """
+                SELECT AVG(duration_secs) FROM (
+                    SELECT
+                        (julianday(MAX(CASE WHEN event_type = 'call_completed'
+                                          THEN timestamp END))
+                       - julianday(MIN(CASE WHEN event_type = 'call_initiated'
+                                          THEN timestamp END))) * 86400.0 AS duration_secs
+                    FROM events
+                    GROUP BY session_id
+                    HAVING duration_secs IS NOT NULL
+                )
+                """
+            ) as cursor:
+                row = await cursor.fetchone()
+                avg_duration: float = row[0] if (row and row[0] is not None) else 0.0
+
+        return {
+            "total": total,
+            "outcomes": outcomes,
+            "calls_today": calls_today,
+            "calls_this_week": calls_this_week,
+            "success_rate": round(success_rate, 4),
+            "avg_duration": round(avg_duration, 2),
+        }

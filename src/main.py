@@ -13,8 +13,10 @@ import structlog
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from src.api.agents import router as agents_router
 from src.api.calls import router as calls_router
 from src.api.dashboard import router as dashboard_router
+from src.api.stats import router as stats_router
 from src.config.settings import settings
 from src.database.event_store import EventStore
 from src.engine.call_manager import CallManager
@@ -89,6 +91,8 @@ app.add_middleware(APIKeyMiddleware)
 app.include_router(vapi_router)
 app.include_router(calls_router)
 app.include_router(dashboard_router)
+app.include_router(agents_router)
+app.include_router(stats_router)
 
 
 # --- Health Check ---
