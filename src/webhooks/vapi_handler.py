@@ -134,15 +134,198 @@ def _resolve_session(payload: dict[str, Any]) -> str | None:
 async def handle_assistant_request(payload: dict[str, Any]) -> dict[str, Any]:
     """Handle assistant-request: Vapi asks us for the assistant config.
 
-    For now, we let Vapi use the assistant config from its dashboard.
-    In the future, this is where we dynamically provide the system prompt
-    with candidate details interpolated.
+    Dynamically builds the system prompt from the agent's YAML config
+    with candidate details interpolated. This means the Vapi dashboard
+    assistant is only a fallback — the backend is the source of truth.
     """
-    logger.info("assistant_request_received")
+    message = payload.get("message", {})
+    call_data = message.get("call", {})
+    metadata = call_data.get("metadata", {})
 
-    # Return nothing — Vapi falls back to the dashboard-configured assistant
-    # TODO: Phase 3+ — Dynamically build system prompt with candidate details
-    return {}
+    agent_config_id = metadata.get("agent_config_id", "")
+    candidate_claims = metadata.get("candidate_claims", {})
+    subject_name = metadata.get("subject_name", "")
+
+    logger.info(
+        "assistant_request_received",
+        agent_config_id=agent_config_id,
+        subject_name=subject_name,
+    )
+
+    if not agent_config_id:
+        # No metadata — fall back to Vapi dashboard assistant
+        return {}
+
+    cm = _get_call_manager()
+    config = cm._agent_configs.get(agent_config_id)
+    if not config:
+        logger.warning("assistant_request_no_config", agent_config_id=agent_config_id)
+        return {}
+
+    # Build dynamic system prompt from YAML config + candidate data
+    system_prompt = _build_dynamic_system_prompt(config, subject_name, candidate_claims)
+
+    # Build tool definitions from the YAML data schema
+    tools = _build_tool_definitions()
+
+    assistant_config: dict[str, Any] = {
+        "assistant": {
+            "model": {
+                "provider": "anthropic",
+                "model": "claude-sonnet-4-20250514",
+                "messages": [{"role": "system", "content": system_prompt}],
+                "tools": tools,
+                "temperature": config.voice_config.temperature,
+            },
+            "firstMessage": (
+                f"Hi, my name is Sarah. I'm calling from Vetty on a recorded line. "
+                f"This call is regarding employment verification of {subject_name}. "
+                f"May I speak to an authorized person who can verify employment?"
+            ),
+        }
+    }
+
+    # Add voice config if specified
+    if config.voice_config.voice_id:
+        assistant_config["assistant"]["voice"] = {
+            "provider": "11labs",
+            "voiceId": config.voice_config.voice_id,
+        }
+
+    logger.info("assistant_config_built", agent_config_id=agent_config_id)
+    return assistant_config
+
+
+def _build_dynamic_system_prompt(
+    config: Any, subject_name: str, candidate_claims: dict[str, Any]
+) -> str:
+    """Build a system prompt dynamically from agent config and candidate data.
+
+    The prompt is assembled from:
+    1. Base role and rules (from the prompt template file)
+    2. Candidate details (interpolated from claims)
+    3. Verification questions (from data_schema question fields)
+    """
+    from pathlib import Path
+
+    # Load base prompt template if it exists
+    template_path = Path(config.system_prompt_template)
+    if template_path.exists():
+        base_prompt = template_path.read_text()
+        # Interpolate candidate data into template variables
+        base_prompt = base_prompt.replace("{{subject_name}}", subject_name)
+        for key, value in candidate_claims.items():
+            base_prompt = base_prompt.replace(f"{{{{{key}}}}}", str(value))
+    else:
+        # Build a minimal prompt from config
+        base_prompt = (
+            f"You are a {config.agent_name} calling on behalf of Vetty, "
+            f"a background screening company.\n\n"
+            f"# Candidate: {subject_name}\n"
+        )
+        for key, value in candidate_claims.items():
+            base_prompt += f"- {key}: {value}\n"
+
+    # Append dynamically-generated verification questions from data_schema
+    questions_section = "\n\n# Verification Questions (ask in this order)\n"
+    has_questions = False
+    for field_schema in config.data_schema:
+        if field_schema.question:
+            question = field_schema.question
+            # Interpolate candidate claim values into questions
+            question = question.replace("{{subject_name}}", subject_name)
+            for key, value in candidate_claims.items():
+                question = question.replace(f"{{{{{key}}}}}", str(value))
+            questions_section += f"- {question}\n"
+            has_questions = True
+
+    if has_questions:
+        base_prompt += questions_section
+
+    return base_prompt
+
+
+def _build_tool_definitions() -> list[dict[str, Any]]:
+    """Build Vapi tool definitions for the AI agent to report data back."""
+    return [
+        {
+            "type": "function",
+            "function": {
+                "name": "record_data_point",
+                "description": "Record a verified data point from the employer",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "field_name": {"type": "string", "description": "Which field is being verified (e.g., 'position', 'month_started')"},
+                        "value": {"type": "string", "description": "What the employer said"},
+                        "verbatim": {"type": "string", "description": "Exact quote from the employer"},
+                        "confidence": {"type": "string", "enum": ["high", "medium", "low"], "description": "How clearly the employer stated this"},
+                    },
+                    "required": ["field_name", "value"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "record_discrepancy",
+                "description": "Record when the employer's info differs from the candidate's claim",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "field_name": {"type": "string"},
+                        "candidate_value": {"type": "string", "description": "What the candidate claimed"},
+                        "employer_value": {"type": "string", "description": "What the employer said"},
+                        "note": {"type": "string", "description": "Context (e.g., 'staffing agency', 'subsidiary')"},
+                    },
+                    "required": ["field_name", "candidate_value", "employer_value"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "record_redirect",
+                "description": "Record that the employer uses a third-party verification service",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "service_name": {"type": "string", "description": "Name of the service (e.g., The Work Number, Thomas & Company)"},
+                    },
+                    "required": ["service_name"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "record_no_record",
+                "description": "Record that the employer has no record of the candidate",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "details": {"type": "string", "description": "Any additional context"},
+                    },
+                    "required": [],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "mark_state_transition",
+                "description": "Signal that you are moving to a new phase of the conversation",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "new_state": {"type": "string", "description": "The state you are transitioning to"},
+                        "trigger": {"type": "string", "description": "What caused this transition"},
+                    },
+                    "required": ["new_state"],
+                },
+            },
+        },
+    ]
 
 
 async def handle_function_call(payload: dict[str, Any]) -> dict[str, Any]:

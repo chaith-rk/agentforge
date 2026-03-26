@@ -19,19 +19,34 @@ class FieldVerification(BaseModel):
     """Verification result for a single field."""
 
     field_name: str
+    display_name: str = ""
     candidate_value: Any = None
     employer_value: Any = None
     match: bool | None = None
     not_provided: bool = False
     note: str = ""
 
+    @property
+    def status(self) -> str:
+        """Derive verification status using the Apple-to-Apple rule.
+
+        - verified: exact match between candidate and employer values
+        - review_needed: values differ in any way (even 1 day)
+        - unable_to_verify: employer refused or field not asked
+        """
+        if self.not_provided:
+            return "unable_to_verify"
+        if self.match is None:
+            return "unable_to_verify"
+        return "verified" if self.match else "review_needed"
+
 
 class VerificationRecord(BaseModel):
     """Final structured output of a completed verification call.
 
-    This record is what gets sent to downstream matching systems.
-    Every field includes both the candidate's claim and the employer's
-    response, enabling the strict "apple-to-apple" comparison.
+    Agent-agnostic: works for employment, education, or any future
+    agent type. Every field includes both the candidate's claim and
+    the employer's confirmation, enabling the strict "apple-to-apple" comparison.
     """
 
     session_id: str
@@ -39,7 +54,6 @@ class VerificationRecord(BaseModel):
 
     # Subject
     subject_name: str
-    company_name: str
 
     # Verifier
     verifier_name: str = ""
@@ -72,20 +86,46 @@ class VerificationRecord(BaseModel):
     call_completed_at: datetime | None = None
     record_generated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
-    def to_report_dict(self) -> dict[str, Any]:
-        """Produce a flat dictionary for downstream systems and reporting.
+    @property
+    def overall_status(self) -> str:
+        """Derive overall verification status — worst individual status wins."""
+        statuses = [fv.status for fv in self.field_verifications]
+        if "review_needed" in statuses:
+            return "review_needed"
+        if "unable_to_verify" in statuses:
+            return "unable_to_verify"
+        if statuses:
+            return "verified"
+        return "unable_to_verify"
 
-        Returns a simplified view of the verification suitable for
-        integration with existing Vetty reporting workflows.
+    def to_report_dict(self) -> dict[str, Any]:
+        """Produce a structured dictionary for downstream systems and the UI.
+
+        Returns a rich view of the verification with per-field status,
+        suitable for the side-by-side display and API responses.
         """
-        report: dict[str, Any] = {
+        fields = []
+        for fv in self.field_verifications:
+            fields.append({
+                "field_name": fv.field_name,
+                "display_name": fv.display_name or fv.field_name,
+                "candidate_value": fv.candidate_value,
+                "verified_value": fv.employer_value,
+                "status": fv.status,
+                "match": fv.match,
+                "note": fv.note,
+            })
+
+        return {
             "session_id": self.session_id,
+            "agent_config_id": self.agent_config_id,
             "subject_name": self.subject_name,
-            "company_name": self.company_name,
             "verifier_name": self.verifier_name,
             "verifier_title": self.verifier_title,
+            "overall_status": self.overall_status,
             "outcome": self.outcome.value,
             "confidence": self.confidence.value,
+            "fields": fields,
             "has_discrepancies": len(self.discrepancies) > 0,
             "discrepancy_count": len(self.discrepancies),
             "fields_refused": self.fields_refused,
@@ -96,11 +136,3 @@ class VerificationRecord(BaseModel):
                 self.call_completed_at.isoformat() if self.call_completed_at else None
             ),
         }
-
-        # Flatten field verifications
-        for fv in self.field_verifications:
-            report[f"{fv.field_name}_candidate"] = fv.candidate_value
-            report[f"{fv.field_name}_employer"] = fv.employer_value
-            report[f"{fv.field_name}_match"] = fv.match
-
-        return report

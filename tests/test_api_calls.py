@@ -54,8 +54,11 @@ async def test_initiate_call_uses_request_assistant_override(monkeypatch: pytest
     request = calls.InitiateCallRequest(
         assistant_id="override_assistant",
         subject_name="Jane Doe",
-        company_name="Acme Inc",
-        company_phone="+15551234567",
+        phone_number="+15551234567",
+        candidate_claims={
+            "employer_company_name": "Acme Inc",
+            "position": "Software Engineer",
+        },
     )
 
     response = await calls.initiate_call(request)
@@ -81,8 +84,10 @@ async def test_initiate_call_falls_back_to_default_assistant(monkeypatch: pytest
 
     request = calls.InitiateCallRequest(
         subject_name="Jane Doe",
-        company_name="Acme Inc",
-        company_phone="+15551234567",
+        phone_number="+15551234567",
+        candidate_claims={
+            "employer_company_name": "Acme Inc",
+        },
     )
 
     response = await calls.initiate_call(request)

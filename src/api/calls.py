@@ -34,7 +34,12 @@ def _get_call_manager():
 
 
 class InitiateCallRequest(BaseModel):
-    """Request body for triggering a new verification call."""
+    """Request body for triggering a new verification call.
+
+    Agent-agnostic: `candidate_claims` is a flexible dict whose keys
+    correspond to field_names defined in the agent's YAML data_schema.
+    The backend validates claims against the selected agent's schema.
+    """
 
     agent_config_id: str = Field(
         default="employment_verification_v1",
@@ -45,14 +50,13 @@ class InitiateCallRequest(BaseModel):
         description="Optional Vapi assistant override for this specific call",
     )
     subject_name: str = Field(..., description="Candidate's full name")
-    company_name: str = Field(..., description="Company to verify against")
-    company_phone: str = Field(..., description="Phone number to call (E.164)")
-    company_address: str = Field(default="", description="Company address")
-    job_title: str = Field(default="", description="Claimed job title")
-    start_date: str = Field(default="", description="Claimed start date")
-    end_date: str = Field(default="", description="Claimed end date (empty if current)")
-    employment_status: str = Field(default="", description="Full-time/part-time/contract")
-    currently_employed: bool = Field(default=False)
+    phone_number: str = Field(..., description="Phone number to call (E.164)")
+    candidate_claims: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Agent-specific candidate claims, keyed by field_name from the agent's data_schema. "
+        "For employment: employer_company_name, position, month_started, year_started, etc. "
+        "For education: institution_name, degree_type, major, etc.",
+    )
 
 
 class CallResponse(BaseModel):
@@ -106,17 +110,11 @@ async def initiate_call(request: InitiateCallRequest) -> CallResponse:
             ),
         )
 
-    # Build candidate claim from request
+    # Build agent-agnostic candidate claim
     candidate = CandidateClaim(
         subject_name=request.subject_name,
-        company_name=request.company_name,
-        company_address=request.company_address,
-        company_phone=request.company_phone,
-        job_title=request.job_title,
-        start_date=request.start_date,
-        end_date=request.end_date,
-        employment_status=request.employment_status,
-        currently_employed=request.currently_employed,
+        phone_number=request.phone_number,
+        claims=request.candidate_claims,
     )
 
     # Trigger call via Vapi
@@ -124,14 +122,14 @@ async def initiate_call(request: InitiateCallRequest) -> CallResponse:
         "session_id": session_id,
         "agent_config_id": request.agent_config_id,
         "subject_name": request.subject_name,
-        "company_name": request.company_name,
+        "candidate_claims": request.candidate_claims,
         "assistant_id": selected_assistant_id,
     }
 
     try:
         async with VapiClient() as vapi_client:
             vapi_response = await vapi_client.create_call(
-                to_number=request.company_phone,
+                to_number=request.phone_number,
                 assistant_id=selected_assistant_id,
                 phone_number_id=settings.vapi_phone_number_id,
                 metadata=metadata,
@@ -159,7 +157,7 @@ async def initiate_call(request: InitiateCallRequest) -> CallResponse:
         "call_initiated",
         session_id=session_id,
         agent_config_id=request.agent_config_id,
-        company_name=request.company_name,
+        subject_name=request.subject_name,
         assistant_id=selected_assistant_id,
         vapi_call_id=vapi_call_id,
     )

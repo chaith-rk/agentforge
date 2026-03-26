@@ -80,12 +80,15 @@ async def make_call(
 
     metadata = {
         "source": "cli_script",
+        "agent_config_id": "employment_verification_v1",
         "subject_name": candidate_name,
-        "company_name": company_name,
-        "job_title": title or DEFAULT_CANDIDATE["title"],
-        "start_date": start_date or DEFAULT_CANDIDATE["start_date"],
-        "end_date": end_date or DEFAULT_CANDIDATE["end_date"],
-        "employment_status": employment_status or DEFAULT_CANDIDATE["status"],
+        "candidate_claims": {
+            "employer_company_name": company_name,
+            "position": title or DEFAULT_CANDIDATE["title"],
+            "start_date": start_date or DEFAULT_CANDIDATE["start_date"],
+            "end_date": end_date or DEFAULT_CANDIDATE["end_date"],
+            "employment_status": employment_status or DEFAULT_CANDIDATE["status"],
+        },
     }
 
     async with VapiClient() as client:

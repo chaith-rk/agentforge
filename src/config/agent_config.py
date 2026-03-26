@@ -83,6 +83,7 @@ class DataPointSchema(BaseModel):
     """
 
     field_name: str = Field(..., description="Unique field identifier")
+    display_name: str = Field(default="", description="Human-readable label for UI display")
     type: DataPointType = Field(..., description="Data type for validation")
     required: bool = Field(default=False, description="Whether this field must be collected")
     enum_values: list[str] | None = Field(
@@ -90,9 +91,18 @@ class DataPointSchema(BaseModel):
         description="Valid values if type is ENUM",
     )
     description: str = Field(default="", description="Human-readable field description")
+    question: str = Field(
+        default="",
+        description="Question the AI agent asks to verify this field. "
+        "Supports {{field_name}} template variables for candidate claim values.",
+    )
     pii_level: PIILevel = Field(
         default=PIILevel.NONE,
         description="PII classification — MEDIUM and HIGH are encrypted at rest",
+    )
+    is_candidate_input: bool = Field(
+        default=False,
+        description="Whether this field is provided as input by the candidate (shown in the call form)",
     )
 
 

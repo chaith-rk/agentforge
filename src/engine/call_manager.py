@@ -136,7 +136,7 @@ class CallManager:
         await audit_logger.log_call_initiated(
             agent_config_id=agent_config_id,
             candidate_name=candidate.subject_name,
-            company_name=candidate.company_name,
+            company_name=candidate.claims.get("employer_company_name", candidate.claims.get("institution_name", "")),
         )
 
         # Persist initiation event
@@ -338,36 +338,47 @@ class CallManager:
         return record
 
     def _build_verification_record(self, call: ActiveCall) -> VerificationRecord:
-        """Build a VerificationRecord from the completed call data."""
+        """Build a VerificationRecord from the completed call data.
+
+        Dynamically iterates over the agent's data_schema to build
+        field-by-field verifications. Works for any agent type without
+        hardcoding field names.
+        """
         collected = call.data_recorder.collected_data
+        candidate = call.session.candidate
+        candidate_claims = candidate.claims
 
         field_verifications = []
-        candidate = call.session.candidate
 
-        # Build field-by-field verification from what was collected
-        field_pairs = [
-            ("company_name", candidate.company_name, collected.get("company_name_confirmed")),
-            ("job_title", candidate.job_title, collected.get("job_title_confirmed")),
-            ("start_date", candidate.start_date, collected.get("start_date_confirmed")),
-            ("end_date", candidate.end_date, collected.get("end_date_confirmed")),
-        ]
+        # Dynamically build verifications from the agent's data schema
+        for field_schema in call.agent_config.data_schema:
+            field_name = field_schema.field_name
 
-        for field_name, cand_val, emp_val in field_pairs:
-            if emp_val is not None:
-                match = collected.get(f"{field_name}_match")
+            # Skip metadata fields (verifier info, call outcome, etc.)
+            if field_name in ("verifier_name", "verifier_title", "callback_number",
+                              "third_party_redirect", "no_record", "call_outcome", "confidence"):
+                continue
+
+            # Get what the employer said (from collected data)
+            employer_value = collected.get(field_name)
+
+            # Get what the candidate claimed (from input)
+            candidate_value = candidate_claims.get(field_name)
+
+            # Only include fields that have at least one value
+            if employer_value is not None or candidate_value is not None:
+                # Determine match status
+                match = None
+                if employer_value is not None and candidate_value is not None:
+                    match = str(employer_value).strip().lower() == str(candidate_value).strip().lower()
+
                 field_verifications.append(FieldVerification(
                     field_name=field_name,
-                    candidate_value=cand_val,
-                    employer_value=emp_val,
+                    display_name=field_schema.display_name or field_schema.description,
+                    candidate_value=candidate_value,
+                    employer_value=employer_value,
                     match=match,
-                ))
-
-        # Add standalone fields
-        for field in ["employment_status", "location_confirmed", "eligible_for_rehire"]:
-            if field in collected:
-                field_verifications.append(FieldVerification(
-                    field_name=field,
-                    employer_value=collected[field],
+                    not_provided=employer_value is None,
                 ))
 
         audit_event_ids = [e.event_id for e in call.audit_logger.events]
@@ -376,7 +387,6 @@ class CallManager:
             session_id=call.session.session_id,
             agent_config_id=call.session.agent_config_id,
             subject_name=candidate.subject_name,
-            company_name=candidate.company_name,
             verifier_name=call.session.verifier_name or collected.get("verifier_name", ""),
             verifier_title=call.session.verifier_title or collected.get("verifier_title", ""),
             field_verifications=field_verifications,

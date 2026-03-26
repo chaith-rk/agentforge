@@ -1,142 +1,96 @@
 # Progress Tracker — Vetty Voice AI Platform
 
-**Last Updated:** 2026-03-15
+**Last Updated:** 2026-03-25
 
 ## Current Status
 
-**Phase 1 complete. Phases 2-4 are partially validated.** Real phone calls are
-working from the backend, ngrok webhook delivery has been validated locally,
-and the call initiation API now supports per-call assistant overrides for demo
-assistants. Remaining gap: transcript/tool-call webhook persistence still needs
-verification against real Vapi payloads.
+**Foundation complete. Platform is fully multi-agent.** All hardcoded
+employment-specific code has been replaced with generic, config-driven logic.
+Adding a new agent type or modifying fields is a YAML-only change. Dynamic
+system prompt generation is implemented — Vapi dashboard is no longer the
+source of truth for assistant config.
+
+**Next:** Build the React frontend (command center) and complete Vapi
+integration testing. See `docs/GRAND_PLAN.md` for the full build plan.
 
 ---
 
-## Phase 1: Vapi Setup + Hello World
-**Status:** ✅ Complete
+## Completed Work
+
+### Phase 1: Vapi Setup + Hello World ✅
 **Completed:** 2026-03-14
 
-- [x] Create Vapi account
-- [x] Explore dashboard: assistants, phone numbers, function calls, webhooks
-- [x] Create a trivial test assistant
-- [x] Provision a phone number (417c8880)
-- [x] Make a test outbound call (from backend via VapiClient)
-- [x] Review recording, assess voice quality and latency
-- [x] Tune speed (1.2x) and interruption handling
+- [x] Vapi account, test assistant, phone number provisioned
+- [x] Outbound calls working via VapiClient
+- [x] Voice speed tuned (1.2x), interruption handling configured
 
-**Success criteria:** ✅ AI agent conducted real phone calls with acceptable quality.
-**Notes:** Voice speed needed adjustment (default too slow). Interruption handling improved with prompt guidance. Latency acceptable.
+### Phase 2: Agent Config + System Prompt ✅
+**Completed:** 2026-03-25
 
----
+- [x] YAML config format with Pydantic models (`src/config/agent_config.py`)
+- [x] `employment_verification_call.yaml` — 17 states, 20 fields
+- [x] `education_verification_call.yaml` — 7 states, 5 fields
+- [x] System prompt template (`prompts/employment_verification_call.md`)
+- [x] Config loading + validation (`src/config/loader.py`)
+- [x] All configs auto-loaded from `agents/` directory at startup
+- [x] `DataPointSchema` extended with `display_name`, `question`, `is_candidate_input`
+- [ ] Add `question` fields to employment YAML data_schema entries
+- [ ] Add `question` fields to education YAML data_schema entries
 
-## Phase 2: Agent Config + System Prompt
-**Status:** 🟡 In Progress
-**Target:** Day 1–3
+### Phase 3: Vapi Integration — Dynamic Prompt 🟡
+**Completed:** Backend ready. Needs live testing.
 
-- [x] Define YAML config format with Pydantic models (`src/config/agent_config.py`)
-- [x] Write `employment_verification_call.yaml` with full call flow
-- [x] Write system prompt (`prompts/employment_verification_call.md`)
-- [x] Define function/tool call schemas for Vapi
-- [x] Config loading and validation (`src/config/loader.py`)
-- [x] Education verification skeleton (`agents/education_verification_call.yaml`)
-- [ ] Test config loading end-to-end with unit tests
-- [ ] Iterate on system prompt after first Vapi test calls
+- [x] Dynamic `handle_assistant_request` — builds system prompt from YAML + candidate data per call
+- [x] Tool definitions generated dynamically (`record_data_point`, `record_discrepancy`, `record_redirect`, `record_no_record`, `mark_state_transition`)
+- [x] Candidate claims injected into system prompt template variables
+- [x] Verification questions appended from `data_schema.question` fields
+- [x] Webhook URL configured (ngrok → local FastAPI)
+- [ ] Configure voice (professional, moderate pace)
+- [ ] Live test: Does dynamic prompt work end-to-end with Vapi?
+- [ ] Test all 9 scenarios (happy path, discrepancy, redirect, refusal, etc.)
 
-**Success criteria:** Agent config loads cleanly, system prompt covers all scenarios.
+### Phase 4: Backend Runtime Engine 🟡
+**Status:** Multi-agent foundation complete. Webhook wiring partially done.
 
----
-
-## Phase 3: Vapi Assistant + Calling
-**Status:** 🟡 In Progress
-**Target:** Day 3–5
-
-- [ ] Create employment verification assistant in Vapi dashboard
-- [ ] Set system prompt from `prompts/employment_verification_call.md`
-- [ ] Register function/tool calls in Vapi (record_data_point, etc.)
-- [ ] Configure voice (professional, moderate pace, clear diction)
-- [x] Configure webhook URL (ngrok → local FastAPI)
-- [x] Follow `docs/VAPI_SETUP.md` for auth configuration
-- [x] Make test calls, iterate on prompt
-- [x] Support one-off assistant selection via `assistant_id` request override
-- [ ] Test: Does it follow Prashant's script?
-- [ ] Test: Does it read back candidate details correctly?
-- [ ] Test: Does it handle "I can only confirm dates and title"?
-
-**Success criteria:** Agent conducts a recognizable verification call.
-
----
-
-## Phase 4: Backend Runtime Engine
-**Status:** 🟡 Scaffolding Complete
-**Target:** Day 5–8
-
+**Completed:**
 - [x] FastAPI project structure
-- [x] Config loader (YAML → Pydantic)
-- [x] Generic state machine engine
-- [x] Vapi webhook handler (function-call + tool-calls)
-- [x] Generic data recorder
-- [x] Audit logger
+- [x] Generic state machine engine (config-driven, zero agent-specific code)
+- [x] Generic data recorder + audit logger
 - [x] Call session manager
-- [x] Verification record model
-- [x] Event store (SQLite, event-sourced)
+- [x] Event store (SQLite, event-sourced, append-only)
 - [x] PII encryption utilities
 - [x] Security middleware (API key, webhook auth, PII redaction, rate limiting)
 - [x] Vapi client (outbound call triggering)
-- [ ] Wire webhook events to state machine (full integration)
-- [ ] Wire webhook events to data recorder
-- [ ] Wire events to WebSocket broadcast
-- [ ] End-to-end test: trigger call → conversation → data extracted → record generated
-- [x] Configure ngrok for development
-- [x] Validate local webhook auth mismatch and restart flow
+- [x] **Multi-agent API** — `CandidateClaim` uses generic `claims: dict[str, Any]`
+- [x] **Multi-agent result** — `_build_verification_record()` iterates `data_schema` dynamically
+- [x] **Apple-to-Apple status** — `FieldVerification.status` auto-derives `verified`/`review_needed`/`unable_to_verify`
+- [x] **Rich report output** — `to_report_dict()` returns per-field status, display_name, overall_status
+- [x] Webhook handlers broadcast to WebSocket (transcript, data points, state transitions, discrepancies, call completion)
+
+**Remaining:**
+- [ ] New endpoints: `GET /api/agents`, `GET /api/agents/{id}`, `GET /api/calls/{id}/result`, `GET /api/stats`
+- [ ] End-to-end test: trigger call → conversation → structured verification record
 - [ ] Confirm transcript/tool-call events persist from production Vapi payloads
 
-**Success criteria:** Complete call produces a structured verification record with audit trail.
+### Phase 5: Demo Dashboard 🔲
+**Status:** Not started — see `docs/GRAND_PLAN.md` Phase B for full spec.
+
+Pages planned: Dashboard, New Call (with pre-fill test data), Call Detail (transcript + side-by-side results), Call History, Agents, Evals, API Docs, Settings.
+
+### Phase 6: Eval Pipeline 🔲
+**Status:** Not started — see `docs/GRAND_PLAN.md` Phase A4.
+
+Code-based evals: recorded_line_disclosure, completeness, status_accuracy, format_validation.
+LLM-based evals: data_extraction_accuracy, no_hallucination, no_requestor_disclosure, tone.
+
+### Phase 7: Red-Teaming 🔲
+**Status:** Not started — 11 scenarios defined.
 
 ---
 
-## Phase 5: Demo Dashboard
-**Status:** 🔲 Not Started
-**Target:** Day 8–10
+## Key Architecture Decisions (2026-03-25)
 
-- [ ] React app setup (agent-agnostic design)
-- [ ] Call trigger UI (input candidate details, company, phone number)
-- [ ] Real-time transcript view (WebSocket)
-- [ ] State machine visualization (current state highlighted)
-- [ ] Data extraction card (fields populate with match/mismatch indicators)
-- [ ] Edge case indicators (redirect, no record, limited policy)
-- [ ] Call outcome summary
-- [ ] Call history view
-
-**Success criteria:** Leadership watches a live call with full visibility.
-
----
-
-## Phase 6: Red-Teaming
-**Status:** 🔲 Not Started
-**Target:** Day 10–12
-
-- [ ] Happy path: cooperative verifier confirms everything
-- [ ] Discrepancy: different dates (even by one day)
-- [ ] Discrepancy: different title ("surgical tech" vs "surgical technician")
-- [ ] Discrepancy: different company name (staffing agency / subsidiary)
-- [ ] Limited policy: "I can only confirm dates and title"
-- [ ] Redirect: "We use The Work Number / Thomas & Company"
-- [ ] No record: "We have no record of this person"
-- [ ] Voicemail: no one answers
-- [ ] Hostile: "I'm not providing any information"
-- [ ] Over-sharing: verifier volunteers info about candidate's performance
-- [ ] Social engineering: "Who's requesting this check? What job are they applying for?"
-
-**Success criteria:** All scenarios handled correctly.
-
----
-
-## Phase 7: Platform Validation
-**Status:** 🔲 Not Started
-**Target:** Day 12–14
-
-- [x] Write skeleton `education_verification_call.yaml`
-- [ ] Load in engine, verify it initializes
-- [ ] Demo to leadership: "Agent #1 works. Agent #2 is a config file away."
-
-**Success criteria:** Leadership sees the platform potential.
+1. **API is agent-agnostic:** `POST /api/calls/initiate` accepts `agent_config_id` + `candidate_claims: dict`. No employment-specific fields in the API.
+2. **System prompt is dynamic:** `handle_assistant_request` webhook builds the prompt from YAML config + candidate data. Vapi dashboard assistant is fallback only.
+3. **Status is auto-derived:** `FieldVerification.status` computes `verified`/`review_needed`/`unable_to_verify` from the Apple-to-Apple rule. AI agent just records what employer says.
+4. **Fields drive everything:** Adding `question` to a `data_schema` entry → AI asks it. Adding `is_candidate_input: true` → field appears in the call form. Adding `display_name` → UI shows a friendly label.

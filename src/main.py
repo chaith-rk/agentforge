@@ -49,12 +49,17 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     await event_store.initialize()
     logger.info("event_store_initialized")
 
-    # Pre-load agent configs
+    # Pre-load all agent configs from the agents directory
     try:
-        call_manager.load_agent_config("agents/employment_verification_call.yaml")
-        logger.info("agent_config_loaded", agent_id="employment_verification_v1")
+        from src.config.loader import load_all_agent_configs
+
+        all_configs = load_all_agent_configs("agents")
+        for agent_id, config in all_configs.items():
+            call_manager._agent_configs[agent_id] = config
+            logger.info("agent_config_loaded", agent_id=agent_id)
+        logger.info("all_agent_configs_loaded", count=len(all_configs))
     except Exception as e:
-        logger.warning("agent_config_load_failed", error=str(e))
+        logger.warning("agent_configs_load_failed", error=str(e))
 
     yield
 

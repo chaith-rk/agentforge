@@ -46,17 +46,19 @@ class Discrepancy(BaseModel):
 
 
 class CandidateClaim(BaseModel):
-    """The candidate's claimed employment details — input to the verification."""
+    """The candidate's claimed details — input to the verification.
+
+    This model is agent-agnostic. The `subject_name` is always required.
+    All other candidate-provided fields are stored in `claims`, a flexible
+    dict validated at runtime against the agent's YAML data_schema.
+    """
 
     subject_name: str
-    company_name: str
-    company_address: str = ""
-    company_phone: str = ""
-    job_title: str = ""
-    start_date: str = ""
-    end_date: str = ""
-    employment_status: str = ""
-    currently_employed: bool = False
+    phone_number: str = ""
+    claims: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Agent-specific candidate claims, keyed by field_name from data_schema",
+    )
 
 
 class CallSession(BaseModel):
