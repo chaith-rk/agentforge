@@ -22,6 +22,7 @@ from src.config.loader import load_agent_config
 from src.database.event_store import EventStore
 from src.engine.audit_logger import AuditLogger
 from src.engine.data_recorder import DataRecorder
+from src.engine.evals import EvalResult, EvalRunner
 from src.engine.state_machine import StateMachine
 from src.models.call_session import CallOutcome, CallSession, CandidateClaim, ConfidenceLevel
 from src.models.events import BaseEvent, EventType
@@ -62,6 +63,7 @@ class CallManager:
         # Map vapi_call_id → session_id for webhook routing
         self._vapi_to_session: dict[str, str] = {}
         self._agent_configs: dict[str, AgentConfig] = {}
+        self._eval_runner = EvalRunner()
 
     def load_agent_config(self, config_path: str) -> AgentConfig:
         """Load and cache an agent configuration."""
@@ -319,7 +321,27 @@ class CallManager:
         # Build verification record
         record = self._build_verification_record(call)
 
-        # Snapshot the final state
+        # Run evals — failures must not prevent call completion
+        try:
+            call_data = self._build_eval_call_data(call, record)
+            eval_results = await self._eval_runner.run_all(call_data)
+            record.eval_results = eval_results
+
+            summary = self._eval_runner.summary(eval_results)
+            eval_event = BaseEvent(
+                session_id=session_id,
+                event_type=EventType.EVAL_COMPLETED,
+                payload={
+                    "results": [r.model_dump(mode="json") for r in eval_results],
+                    "summary": summary,
+                },
+                actor="eval_pipeline",
+            )
+            await self._event_store.append_event(eval_event)
+        except Exception:
+            logger.exception("eval_pipeline_error", session_id=session_id)
+
+        # Snapshot the final state (includes eval results)
         await self._event_store.create_snapshot(
             session_id, record.to_report_dict()
         )
@@ -336,6 +358,26 @@ class CallManager:
         )
 
         return record
+
+    def _build_eval_call_data(self, call: ActiveCall, record: VerificationRecord) -> dict[str, Any]:
+        """Assemble the call_data dict expected by BaseEval.evaluate."""
+        return {
+            "session_id": call.session.session_id,
+            "transcript": call.session.transcript,
+            "collected_data": call.data_recorder.collected_data,
+            "field_verifications": [
+                {
+                    "field_name": fv.field_name,
+                    "candidate_value": fv.candidate_value,
+                    "employer_value": fv.employer_value,
+                    "status": fv.status,
+                    "match": fv.match,
+                }
+                for fv in record.field_verifications
+            ],
+            "outcome": call.session.outcome.value,
+            "agent_config_id": call.session.agent_config_id,
+        }
 
     def _build_verification_record(self, call: ActiveCall) -> VerificationRecord:
         """Build a VerificationRecord from the completed call data.

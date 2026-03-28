@@ -38,6 +38,7 @@ class EventType(str, Enum):
     CALL_REFUSED = "call_refused"
     TRANSCRIPT_UPDATED = "transcript_updated"
     ERROR_OCCURRED = "error_occurred"
+    EVAL_COMPLETED = "eval_completed"
 
 
 class BaseEvent(BaseModel):

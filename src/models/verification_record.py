@@ -12,6 +12,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from src.engine.evals.base import EvalResult
 from src.models.call_session import CallOutcome, ConfidenceLevel, Discrepancy
 
 
@@ -75,6 +76,9 @@ class VerificationRecord(BaseModel):
     # Third-party redirect info
     third_party_redirect: str = ""
 
+    # Eval results
+    eval_results: list[EvalResult] = Field(default_factory=list)
+
     # Audit trail
     audit_event_ids: list[str] = Field(default_factory=list)
 
@@ -134,5 +138,10 @@ class VerificationRecord(BaseModel):
             "call_started_at": self.call_started_at.isoformat(),
             "call_completed_at": (
                 self.call_completed_at.isoformat() if self.call_completed_at else None
+            ),
+            "eval_results": [r.model_dump(mode="json") for r in self.eval_results],
+            "eval_pass_rate": (
+                sum(1 for r in self.eval_results if r.passed) / len(self.eval_results)
+                if self.eval_results else None
             ),
         }

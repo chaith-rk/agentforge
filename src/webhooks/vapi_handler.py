@@ -16,6 +16,7 @@ from typing import Any
 import structlog
 from fastapi import APIRouter, HTTPException, Request, status
 
+from src.config.agent_config import AgentConfig
 from src.config.settings import settings
 from src.middleware.security import validate_webhook_secret, validate_webhook_signature
 
@@ -197,7 +198,7 @@ async def handle_assistant_request(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def _build_dynamic_system_prompt(
-    config: Any, subject_name: str, candidate_claims: dict[str, Any]
+    config: AgentConfig, subject_name: str, candidate_claims: dict[str, Any]
 ) -> str:
     """Build a system prompt dynamically from agent config and candidate data.
 
@@ -212,10 +213,7 @@ def _build_dynamic_system_prompt(
     template_path = Path(config.system_prompt_template)
     if template_path.exists():
         base_prompt = template_path.read_text()
-        # Interpolate candidate data into template variables
-        base_prompt = base_prompt.replace("{{subject_name}}", subject_name)
-        for key, value in candidate_claims.items():
-            base_prompt = base_prompt.replace(f"{{{{{key}}}}}", str(value))
+        base_prompt = _interpolate_template(base_prompt, subject_name, candidate_claims)
     else:
         # Build a minimal prompt from config
         base_prompt = (
@@ -228,21 +226,38 @@ def _build_dynamic_system_prompt(
 
     # Append dynamically-generated verification questions from data_schema
     questions_section = "\n\n# Verification Questions (ask in this order)\n"
+    questions_section += (
+        "For each question below, use the record_data_point tool to record "
+        "the answer with the corresponding field_name.\n\n"
+    )
     has_questions = False
     for field_schema in config.data_schema:
-        if field_schema.question:
-            question = field_schema.question
-            # Interpolate candidate claim values into questions
-            question = question.replace("{{subject_name}}", subject_name)
-            for key, value in candidate_claims.items():
-                question = question.replace(f"{{{{{key}}}}}", str(value))
-            questions_section += f"- {question}\n"
-            has_questions = True
+        if not field_schema.question:
+            continue
+        question = _interpolate_template(
+            field_schema.question, subject_name, candidate_claims
+        )
+        label = field_schema.display_name or field_schema.field_name
+        questions_section += (
+            f"- **{label}** (field_name: `{field_schema.field_name}`): "
+            f"{question}\n"
+        )
+        has_questions = True
 
     if has_questions:
         base_prompt += questions_section
 
     return base_prompt
+
+
+def _interpolate_template(
+    template: str, subject_name: str, candidate_claims: dict[str, Any]
+) -> str:
+    """Replace {{variable}} placeholders with candidate claim values."""
+    result = template.replace("{{subject_name}}", subject_name)
+    for key, value in candidate_claims.items():
+        result = result.replace(f"{{{{{key}}}}}", str(value))
+    return result
 
 
 def _build_tool_definitions() -> list[dict[str, Any]]:
