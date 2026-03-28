@@ -35,15 +35,20 @@ class Settings(BaseSettings):
     # Vapi integration
     vapi_api_key: str = ""
     vapi_webhook_secret: str = ""
-    vapi_assistant_id: str = ""
+    vapi_assistant_id: str = ""  # deprecated — kept for backwards compat
     vapi_phone_number_id: str = ""
+    vapi_server_url: str = ""  # webhook URL Vapi calls back (ngrok or hosted)
 
     # Database
     database_url: str = "sqlite+aiosqlite:///data/calls.db"
 
     # API security
     api_key: str = ""
-    cors_origins: list[str] = ["http://localhost:3000", "http://localhost:5173", "http://localhost:5174"]
+    cors_origins: list[str] = [
+        "http://localhost:3000",
+        "http://localhost:5173",
+        "http://localhost:5174",
+    ]
 
     # Application
     log_level: str = "INFO"

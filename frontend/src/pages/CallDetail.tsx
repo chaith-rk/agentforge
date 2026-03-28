@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { Wifi, WifiOff, Download } from 'lucide-react'
+import { Wifi, WifiOff, Download, PhoneOff } from 'lucide-react'
 import { useCallWebSocket } from '../hooks/useCallWebSocket'
 import { StatusBadge } from '../components/StatusBadge'
 import { api, type CallResult } from '../lib/api'
@@ -19,7 +19,10 @@ function useTimer(running: boolean) {
 
 export default function CallDetail() {
   const { id } = useParams<{ id: string }>()
-  const { transcript, collectedData, currentState, isConnected, callCompleted } = useCallWebSocket(id ?? null)
+  const ws = useCallWebSocket(id ?? null)
+  const { transcript, collectedData, currentState, isConnected } = ws
+  const [stopped, setStopped] = useState(false)
+  const callCompleted = ws.callCompleted || stopped
   const transcriptEnd = useRef<HTMLDivElement>(null)
   const [result, setResult] = useState<CallResult | null>(null)
   const timer = useTimer(isConnected && !callCompleted)
@@ -80,6 +83,15 @@ export default function CallDetail() {
         )}
         {isConnected && <span className="text-sm font-mono text-gray-700">{timer}</span>}
         <div className="ml-auto flex items-center gap-3">
+          {isConnected && !callCompleted && id && (
+            <button
+              onClick={() => api.stopCall(id).then(() => setStopped(true)).catch(() => null)}
+              className="flex items-center gap-1.5 text-sm text-red-600 hover:text-red-800 border border-red-200 px-3 py-1.5 rounded-lg hover:bg-red-50"
+            >
+              <PhoneOff className="w-3.5 h-3.5" />
+              End Call
+            </button>
+          )}
           <StatusBadge status={overallStatus} size="md" />
           {callCompleted && (
             <button onClick={downloadReport} className="flex items-center gap-1.5 text-sm text-gray-600 hover:text-gray-900 border border-gray-200 px-3 py-1.5 rounded-lg hover:bg-gray-50">

@@ -33,7 +33,9 @@ export function useCallWebSocket(sessionId: string | null): UseCallWebSocketResu
   useEffect(() => {
     if (!sessionId) return
 
-    const wsUrl = `ws://localhost:8000/api/ws/${sessionId}`
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+    const wsHost = import.meta.env.VITE_WS_HOST || window.location.host
+    const wsUrl = `${wsProtocol}//${wsHost}/api/ws/${sessionId}`
     let ws: WebSocket
     let reconnectTimeout: ReturnType<typeof setTimeout>
     let cancelled = false

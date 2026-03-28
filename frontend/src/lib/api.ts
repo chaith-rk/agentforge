@@ -1,5 +1,5 @@
-const API_BASE = 'http://localhost:8000/api'
-const API_KEY = 'caf1480bd07a54157b19d71611798138294b5a45770fd94e'
+const API_BASE = import.meta.env.VITE_API_BASE || '/api'
+const API_KEY = import.meta.env.VITE_API_KEY || ''
 
 export interface CallStats {
   total_calls: number
@@ -113,4 +113,6 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(data),
     }),
+  stopCall: (id: string) =>
+    apiFetch<{ status: string }>(`/calls/${id}/stop`, { method: 'POST' }),
 }

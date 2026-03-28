@@ -18,6 +18,7 @@ from pydantic import BaseModel, Field
 from src.config.settings import settings
 from src.models.call_session import CandidateClaim
 from src.vapi.client import VapiClient
+from src.webhooks.vapi_handler import _build_dynamic_system_prompt, _build_tool_definitions
 
 logger = structlog.get_logger(__name__)
 
@@ -44,10 +45,6 @@ class InitiateCallRequest(BaseModel):
     agent_config_id: str = Field(
         default="employment_verification_v1",
         description="Which agent type to use",
-    )
-    assistant_id: str = Field(
-        default="",
-        description="Optional Vapi assistant override for this specific call",
     )
     subject_name: str = Field(..., description="Candidate's full name")
     phone_number: str = Field(..., description="Phone number to call (E.164)")
@@ -92,22 +89,16 @@ async def initiate_call(request: InitiateCallRequest) -> CallResponse:
     the outbound call via Vapi.
     """
     session_id = str(uuid.uuid4())
-    selected_assistant_id = request.assistant_id or settings.vapi_assistant_id
 
-    if not settings.vapi_api_key or not selected_assistant_id or not settings.vapi_phone_number_id:
+    if not settings.vapi_api_key or not settings.vapi_phone_number_id:
         logger.warning(
             "vapi_config_missing",
             has_api_key=bool(settings.vapi_api_key),
-            has_assistant_id=bool(selected_assistant_id),
             has_phone_number_id=bool(settings.vapi_phone_number_id),
         )
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=(
-                "Vapi is not fully configured. Set VAPI_API_KEY, "
-                "VAPI_PHONE_NUMBER_ID, and either VAPI_ASSISTANT_ID "
-                "or assistant_id in the request."
-            ),
+            detail="Vapi is not fully configured. Set VAPI_API_KEY and VAPI_PHONE_NUMBER_ID in .env.",
         )
 
     # Build agent-agnostic candidate claim
@@ -117,21 +108,67 @@ async def initiate_call(request: InitiateCallRequest) -> CallResponse:
         claims=request.candidate_claims,
     )
 
-    # Trigger call via Vapi
+    # Pre-load agent config so handle_assistant_request can find it
+    cm = _get_call_manager()
+    config_path = f"agents/{request.agent_config_id.replace('_v1', '_call')}.yaml"
+    try:
+        cm.load_agent_config(config_path)
+    except FileNotFoundError:
+        pass  # Will fall back in create_call
+
+    # Build the full assistant config inline so Vapi knows model/voice/tools
+    config = cm._agent_configs.get(request.agent_config_id)
+    if not config:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unknown agent config: {request.agent_config_id}",
+        )
+
+    system_prompt = _build_dynamic_system_prompt(config, request.subject_name, request.candidate_claims)
+    tools = _build_tool_definitions()
+
+    assistant_config: dict[str, Any] = {
+        "model": {
+            "provider": "anthropic",
+            "model": "claude-sonnet-4-20250514",
+            "messages": [{"role": "system", "content": system_prompt}],
+            "tools": tools,
+            "temperature": config.voice_config.temperature,
+        },
+        "serverUrl": settings.vapi_server_url,
+        "firstMessage": (
+            f"Hi, my name is Sarah. I'm calling from AgentForge on a recorded line. "
+            f"This call is regarding employment verification of {request.subject_name}"
+            f"{' at ' + request.candidate_claims.get('employer_company_name', '') if request.candidate_claims.get('employer_company_name') else ''}. "
+            f"May I speak to an authorized person who can verify employment?"
+        ),
+    }
+
+    # Add voice config — use Vapi's default if no voice_id configured
+    if config.voice_config.voice_id:
+        assistant_config["voice"] = {
+            "provider": "11labs",
+            "voiceId": config.voice_config.voice_id,
+        }
+    else:
+        assistant_config["voice"] = {
+            "provider": "vapi",
+            "voiceId": "Elliot",
+        }
+
     metadata = {
         "session_id": session_id,
         "agent_config_id": request.agent_config_id,
         "subject_name": request.subject_name,
         "candidate_claims": request.candidate_claims,
-        "assistant_id": selected_assistant_id,
     }
 
     try:
         async with VapiClient() as vapi_client:
             vapi_response = await vapi_client.create_call(
                 to_number=request.phone_number,
-                assistant_id=selected_assistant_id,
                 phone_number_id=settings.vapi_phone_number_id,
+                assistant=assistant_config,
                 metadata=metadata,
             )
     except httpx.HTTPError as exc:
@@ -145,7 +182,6 @@ async def initiate_call(request: InitiateCallRequest) -> CallResponse:
 
     # Create call session in the CallManager (initializes state machine,
     # data recorder, audit logger, and persists to event store)
-    cm = _get_call_manager()
     await cm.create_call(
         session_id=session_id,
         agent_config_id=request.agent_config_id,
@@ -158,7 +194,6 @@ async def initiate_call(request: InitiateCallRequest) -> CallResponse:
         session_id=session_id,
         agent_config_id=request.agent_config_id,
         subject_name=request.subject_name,
-        assistant_id=selected_assistant_id,
         vapi_call_id=vapi_call_id,
     )
 
@@ -168,6 +203,41 @@ async def initiate_call(request: InitiateCallRequest) -> CallResponse:
         message="Call initiated. Track via WebSocket or GET /api/calls/{session_id}.",
         vapi_call_id=vapi_call_id,
     )
+
+
+@router.post("/{session_id}/stop")
+async def stop_call(session_id: str) -> dict[str, str]:
+    """Stop an active call by ending it via Vapi."""
+    cm = _get_call_manager()
+    active = cm.get_active_call(session_id)
+
+    if not active:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No active call for session {session_id}",
+        )
+
+    vapi_call_id = active.session.vapi_call_id
+    if not vapi_call_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No Vapi call ID associated with this session",
+        )
+
+    try:
+        async with VapiClient() as vapi_client:
+            client = vapi_client._ensure_client()
+            response = await client.delete(f"/call/{vapi_call_id}")
+            response.raise_for_status()
+    except httpx.HTTPError as exc:
+        logger.warning("stop_call_failed", session_id=session_id, error=str(exc))
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Failed to stop call via Vapi",
+        ) from exc
+
+    logger.info("call_stopped", session_id=session_id, vapi_call_id=vapi_call_id)
+    return {"status": "stopped", "session_id": session_id}
 
 
 @router.get("/{session_id}", response_model=CallStatusResponse)

@@ -362,15 +362,25 @@ async def handle_function_call(payload: dict[str, Any]) -> dict[str, Any]:
 async def handle_tool_calls(payload: dict[str, Any]) -> dict[str, Any]:
     """Handle modern tool-calls message with one or more tool invocations."""
     message = payload.get("message", {})
+
+    logger.info(
+        "tool_calls_payload_debug",
+        message_keys=list(message.keys()),
+        tool_call_list_sample=str(message.get("toolCallList", [])[:1])[:500],
+        tool_with_sample=str(message.get("toolWithToolCallList", [])[:1])[:500],
+    )
+
     tool_call_list = message.get("toolCallList", []) or []
     tool_with_tool_call_list = message.get("toolWithToolCallList", []) or []
 
     results: list[dict[str, str]] = []
 
     for tool_call in tool_call_list:
-        function_name = tool_call.get("name", "")
+        # Vapi uses OpenAI format: {id, type, function: {name, arguments}}
+        func = tool_call.get("function", {})
+        function_name = func.get("name", "") or tool_call.get("name", "")
         parameters = _normalize_parameters(
-            tool_call.get("arguments", tool_call.get("parameters", {}))
+            func.get("arguments", tool_call.get("arguments", tool_call.get("parameters", {})))
         )
         tool_call_id = tool_call.get("id", "")
 
@@ -381,9 +391,11 @@ async def handle_tool_calls(payload: dict[str, Any]) -> dict[str, Any]:
         tool_call = item.get("toolCall", {})
         tool = item.get("tool", {})
 
-        function_name = tool_call.get("name", "") or tool.get("name", "")
+        # Also check nested function object
+        func = tool_call.get("function", {})
+        function_name = func.get("name", "") or tool_call.get("name", "") or tool.get("name", "")
         parameters = _normalize_parameters(
-            tool_call.get("arguments", tool_call.get("parameters", {}))
+            func.get("arguments", tool_call.get("arguments", tool_call.get("parameters", {})))
         )
         tool_call_id = tool_call.get("id", "")
 
@@ -422,16 +434,40 @@ async def handle_end_of_call(payload: dict[str, Any]) -> dict[str, Any]:
 
     if session_id:
         cm = _get_call_manager()
+
+        # Extract transcript from artifact if available
+        artifact = message.get("artifact", {})
+        artifact_messages = artifact.get("messages", [])
+        if artifact_messages:
+            ws = _get_connection_manager()
+            for msg in artifact_messages:
+                role = msg.get("role", "unknown")
+                content = msg.get("message", msg.get("content", ""))
+                if not content or role == "system":
+                    continue
+                if role == "assistant":
+                    role = "agent"
+                await cm.update_transcript(session_id, role, content)
+                try:
+                    await ws.broadcast_to_session(session_id, {
+                        "type": "transcript",
+                        "role": role,
+                        "content": content,
+                    })
+                except Exception:
+                    pass
+
         record = await cm.complete_call(
             session_id=session_id,
             outcome=outcome,
             duration_seconds=duration,
         )
 
-        # Broadcast completion to dashboard
+        # Broadcast completion to dashboard — frontend expects {type} at top level
         try:
             ws = _get_connection_manager()
-            await ws.broadcast_event(session_id, "call_completed", {
+            await ws.broadcast_to_session(session_id, {
+                "type": "call_completed",
                 "outcome": outcome,
                 "duration_seconds": duration,
                 "verification_record": record.to_report_dict() if record else None,
@@ -454,15 +490,59 @@ async def handle_transcript(payload: dict[str, Any]) -> dict[str, Any]:
         cm = _get_call_manager()
         await cm.update_transcript(session_id, role, transcript_text)
 
-        # Broadcast to dashboard
+        # Broadcast to dashboard — frontend expects {type, role, content} at top level
         try:
             ws = _get_connection_manager()
-            await ws.broadcast_event(session_id, "transcript_update", {
+            await ws.broadcast_to_session(session_id, {
+                "type": "transcript",
                 "role": role,
                 "content": transcript_text,
             })
         except Exception as e:
             logger.warning("websocket_broadcast_failed", error=str(e))
+
+    return {"status": "ok"}
+
+
+async def handle_conversation_update(payload: dict[str, Any]) -> dict[str, Any]:
+    """Handle conversation-update: Vapi sends the full conversation history.
+
+    Each update fires when a new message is added. We broadcast only
+    the latest message to avoid duplicates on the frontend.
+    """
+    session_id = _resolve_session(payload)
+    message = payload.get("message", {})
+
+    # Vapi sends messages in OpenAI format: [{role, content}, ...]
+    messages = message.get("messagesOpenAIFormatted", []) or message.get("messages", [])
+
+    if not session_id or not messages:
+        return {"status": "ok"}
+
+    # Only process the last (newest) message
+    last_msg = messages[-1]
+    role = last_msg.get("role", "unknown")
+    content = last_msg.get("content", "")
+
+    if not content or role == "system" or role == "tool":
+        return {"status": "ok"}
+
+    # Normalize role names
+    if role == "assistant":
+        role = "agent"
+
+    cm = _get_call_manager()
+    await cm.update_transcript(session_id, role, content)
+
+    try:
+        ws = _get_connection_manager()
+        await ws.broadcast_to_session(session_id, {
+            "type": "transcript",
+            "role": role,
+            "content": content,
+        })
+    except Exception as e:
+        logger.warning("websocket_broadcast_failed", error=str(e))
 
     return {"status": "ok"}
 
@@ -508,10 +588,11 @@ async def handle_record_data_point(
         cm = _get_call_manager()
         await cm.record_data_point(session_id, field_name, value, confidence)
 
-        # Broadcast to dashboard
+        # Broadcast to dashboard — frontend expects {type: "data_point", ...} at top level
         try:
             ws = _get_connection_manager()
-            await ws.broadcast_event(session_id, "data_point_recorded", {
+            await ws.broadcast_to_session(session_id, {
+                "type": "data_point",
                 "field_name": field_name,
                 "value": value,
                 "confidence": confidence,
@@ -619,6 +700,7 @@ WEBHOOK_HANDLERS: dict[str, Any] = {
     "tool-calls": handle_tool_calls,
     "end-of-call-report": handle_end_of_call,
     "transcript": handle_transcript,
+    "conversation-update": handle_conversation_update,
     "status-update": handle_status_update,
 }
 

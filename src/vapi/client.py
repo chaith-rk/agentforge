@@ -25,8 +25,8 @@ class VapiClient:
         async with VapiClient() as client:
             call = await client.create_call(
                 to_number="+15551234567",
-                assistant_id="asst_xxx",
                 phone_number_id="pn_xxx",
+                metadata={...},
             )
     """
 
@@ -57,16 +57,19 @@ class VapiClient:
     async def create_call(
         self,
         to_number: str,
-        assistant_id: str,
         phone_number_id: str,
+        assistant: dict[str, Any] | None = None,
         metadata: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Trigger an outbound phone call via Vapi.
 
+        Passes a fully-built inline assistant config so Vapi knows
+        the model, voice, tools, and system prompt for this call.
+
         Args:
             to_number: Destination E.164 phone number to call.
-            assistant_id: Vapi assistant ID to use for the call.
             phone_number_id: Vapi phone number ID to place the call from.
+            assistant: Full inline assistant config (model, voice, tools, etc.).
             metadata: Additional metadata to attach to the call.
 
         Returns:
@@ -74,17 +77,33 @@ class VapiClient:
         """
         client = self._ensure_client()
 
+        # Normalize to E.164 format
+        normalized_number = to_number.strip()
+        if not normalized_number.startswith("+"):
+            normalized_number = f"+{normalized_number}"
+
         payload: dict[str, Any] = {
             "customer": {
-                "number": to_number,
+                "number": normalized_number,
             },
-            "assistantId": assistant_id,
             "phoneNumberId": phone_number_id,
         }
+
+        if assistant:
+            payload["assistant"] = assistant
+
         if metadata:
             payload["metadata"] = metadata
 
-        response = await client.post("/call/phone", json=payload)
+        response = await client.post("/call", json=payload)
+        if response.status_code >= 400:
+            import structlog
+            structlog.get_logger().error(
+                "vapi_api_error",
+                status=response.status_code,
+                body=response.text,
+                payload=payload,
+            )
         response.raise_for_status()
         return response.json()
 

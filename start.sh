@@ -1,7 +1,7 @@
 #!/bin/bash
 # Start backend and frontend together
 
-PROJECT="/Users/chaitanyarajkumar/cursor_projects/agentforge-platform"
+PROJECT="/Users/chaitanyarajkumar/cursor_projects/vetty-voice-platform"
 
 echo ""
 echo "  Starting AgentForge Platform..."
