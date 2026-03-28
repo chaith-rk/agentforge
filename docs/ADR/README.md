@@ -1,6 +1,6 @@
 # Architecture Decision Records
 
-This directory contains Architecture Decision Records (ADRs) for the Vetty Voice AI Platform. ADRs document significant architectural decisions, their context, and consequences.
+This directory contains Architecture Decision Records (ADRs) for the AgentForge Platform. ADRs document significant architectural decisions, their context, and consequences.
 
 ## Index
 

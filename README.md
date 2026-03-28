@@ -1,12 +1,12 @@
-# Vetty Voice AI Platform
+# AgentForge Platform
 
-AI-powered voice agent platform for automated employment verification calls, built for [Vetty](https://vetty.co) background screening operations.
+AI-powered voice agent platform for automated employment verification calls, built for [AgentForge](https://agentforge.co) background screening operations.
 
 ## Architecture Overview
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                        Vetty Voice AI Platform                         │
+│                        AgentForge Platform                         │
 ├─────────────────────────────────────────────────────────────────────────┤
 │                                                                         │
 │  ┌──────────────┐    ┌─────────────────────┐    ┌───────────────────┐  │
@@ -45,7 +45,7 @@ AI-powered voice agent platform for automated employment verification calls, bui
 ```bash
 # Clone the repository
 git clone <repo-url>
-cd vetty-voice-platform
+cd agentforge-platform
 
 # Create virtual environment
 python -m venv venv
@@ -114,7 +114,7 @@ curl -X POST http://localhost:8000/api/calls/initiate \
 ## Project Structure
 
 ```
-vetty-voice-platform/
+agentforge-platform/
 ├── agents/                          # YAML agent configurations
 │   ├── employment_verification_call.yaml   # Employment verification agent
 │   └── education_verification_call.yaml    # Education verification (skeleton)
@@ -191,7 +191,7 @@ This platform handles sensitive PII during employment verification. Security mea
 | **API Authentication** | API key validation via `X-API-Key` header on all client endpoints |
 | **PII Encryption** | Fernet symmetric encryption for MEDIUM/HIGH PII fields at rest |
 | **PII in Logs** | Regex-based PII redaction in all structured log output |
-| **Container Security** | Non-root user (`vetty`) in multi-stage Docker build |
+| **Container Security** | Non-root user (`agentforge`) in multi-stage Docker build |
 | **Rate Limiting** | In-memory rate limiter (Redis-backed in production) |
 | **SQL Injection** | Parameterized queries only; no string interpolation in SQL |
 | **Secret Management** | All secrets via environment variables; `.env` in `.gitignore` |
@@ -212,4 +212,4 @@ See [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md) for the full threat model.
 
 ## License
 
-Proprietary. Internal use at Vetty only.
+Proprietary. Internal use at AgentForge only.

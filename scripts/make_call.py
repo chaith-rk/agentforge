@@ -115,7 +115,7 @@ async def make_call(
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Trigger a Vetty verification call",
+        description="Trigger a AgentForge verification call",
     )
     parser.add_argument(
         "--to", required=True, help="Phone number to call (E.164 format, e.g., +12025551234)"

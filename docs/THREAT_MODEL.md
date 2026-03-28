@@ -1,4 +1,4 @@
-# Threat Model — Vetty Voice AI Platform
+# Threat Model — AgentForge Platform
 
 **Version:** 1.0
 **Date:** 2026-03-14
@@ -97,7 +97,7 @@
 
 | Risk | Mitigation | Status |
 |------|-----------|--------|
-| Root container execution | Non-root user (`vetty`) in Dockerfile | ✅ Implemented |
+| Root container execution | Non-root user (`agentforge`) in Dockerfile | ✅ Implemented |
 | Unnecessary packages | Multi-stage build, slim base image | ✅ Implemented |
 | Container health | Docker HEALTHCHECK with auto-restart | ✅ Implemented |
 
@@ -123,7 +123,7 @@
 ## 5. Compliance Considerations
 
 ### FCRA (Fair Credit Reporting Act)
-- Vetty operates as a Consumer Reporting Agency (CRA)
+- AgentForge operates as a Consumer Reporting Agency (CRA)
 - Verification records must be accurate and complete
 - Consumers have the right to dispute inaccurate information
 - **Platform support:** Immutable event log provides evidence trail. Both candidate and employer versions of disputed data are recorded.

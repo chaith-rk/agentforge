@@ -44,7 +44,7 @@ session_id = response.json()["session_id"]`,
 const comingSoon = [
   { title: 'Webhook Callbacks', desc: 'Register a URL to receive call completion notifications automatically' },
   { title: 'Batch API', desc: 'Upload a CSV with multiple verifications and receive results via webhook' },
-  { title: 'MCP Server', desc: 'Connect Vetty Voice to any MCP-compatible AI assistant for verification workflows' },
+  { title: 'MCP Server', desc: 'Connect AgentForge to any MCP-compatible AI assistant for verification workflows' },
 ]
 
 const methodColors: Record<string, string> = {
@@ -60,7 +60,7 @@ export default function ApiDocs() {
   return (
     <div className="p-6 max-w-4xl mx-auto">
       <h1 className="text-2xl font-bold text-gray-900 mb-1">API Docs</h1>
-      <p className="text-sm text-gray-500 mb-6">Integrate Vetty Voice into your workflow</p>
+      <p className="text-sm text-gray-500 mb-6">Integrate AgentForge into your workflow</p>
 
       {/* Auth */}
       <div className="bg-gray-50 border border-gray-200 rounded-xl p-5 mb-6">

@@ -9,11 +9,11 @@
 ## Standard Call Script
 
 **Opening (exact wording):**
-> "Hi, my name is Prashant. I'm calling from Vetty on a recorded line. This call is regarding employment verification of [candidate name]. May I speak to an authorized person who can verify employment?"
+> "Hi, my name is Prashant. I'm calling from AgentForge on a recorded line. This call is regarding employment verification of [candidate name]. May I speak to an authorized person who can verify employment?"
 
 **Key elements that MUST be included:**
 1. Agent name
-2. "From Vetty"
+2. "From AgentForge"
 3. "On a recorded line" (legal requirement)
 4. Candidate name
 5. Request for authorized person
@@ -31,7 +31,7 @@
 3. Check Work Number (search by company name, verify spelling via Google)
    ├── If listed → Run Work Number (uses SSN)
    └── If not listed → Continue to next step
-4. Check Vetty's internal Contact Database (Google Sheet)
+4. Check AgentForge's internal Contact Database (Google Sheet)
    ├── If found → Use stored email/phone, fulfillment method noted
    └── If not found → Google search for contact info
 5. Google search for employer contact info
@@ -91,7 +91,7 @@
 - Documents that meet criteria: candidate name, entity name, dates, on letterhead
 - ALL document-based verifications marked as **"Review Needed"** (never "Verified")
 - Canned note: "Despite numerous attempts, the company remained unresponsive. Verification has been updated based on the candidate-provided [document type]."
-- Documents are considered potentially fake — Vetty has no authority to verify authenticity
+- Documents are considered potentially fake — AgentForge has no authority to verify authenticity
 
 ### 5. Currently Employed Discrepancy
 - Candidate says "I still work here = No" but employer/TWN says "ACTIVE"

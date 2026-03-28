@@ -31,7 +31,7 @@ states:
     name: GREETING
     description: "Open the call with recorded line disclosure"
     system_prompt_section: >
-      Open with: "Hi, my name is [agent_name]. I'm calling from Vetty on a
+      Open with: "Hi, my name is [agent_name]. I'm calling from AgentForge on a
       recorded line. This call is regarding education verification of
       [subject_name]. May I speak to someone in the registrar's office who can
       verify enrollment and degree records?"
@@ -225,7 +225,7 @@ states:
     name: LEAVE_VOICEMAIL
     description: "Leave a voicemail requesting callback"
     system_prompt_section: >
-      Say: "Hi, this is [agent_name] calling from Vetty regarding an
+      Say: "Hi, this is [agent_name] calling from AgentForge regarding an
       education verification. Could you please return my call at
       [callback_number]? Thank you."
     transitions: []

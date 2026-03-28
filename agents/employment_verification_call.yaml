@@ -3,7 +3,7 @@ agent_name: "Employment Verification Agent"
 version: "1.0.0"
 description: >
   AI voice agent that conducts outbound employment verification calls
-  following Vetty's standard verification workflow. Uses a confirm/deny
+  following AgentForge's standard verification workflow. Uses a confirm/deny
   approach — reads back candidate's claimed details and asks the employer
   to confirm each one.
 
@@ -36,9 +36,9 @@ compliance_checkpoints:
 states:
   GREETING:
     name: GREETING
-    description: "Open the call with Vetty's standard greeting including recorded line disclosure"
+    description: "Open the call with AgentForge's standard greeting including recorded line disclosure"
     system_prompt_section: >
-      Open with: "Hi, my name is [agent_name]. I'm calling from Vetty on a
+      Open with: "Hi, my name is [agent_name]. I'm calling from AgentForge on a
       recorded line. This call is regarding employment verification of
       [subject_name]. May I speak to an authorized person who can verify employment?"
     transitions:
@@ -280,7 +280,7 @@ states:
     name: LEAVE_VOICEMAIL
     description: "Leave a voicemail requesting callback"
     system_prompt_section: >
-      Say: "Hi, this is [agent_name] calling from Vetty regarding an
+      Say: "Hi, this is [agent_name] calling from AgentForge regarding an
       employment verification. Could you please return my call at
       [callback_number]? Thank you."
     transitions: []

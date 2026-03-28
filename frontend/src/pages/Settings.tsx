@@ -50,7 +50,7 @@ export default function Settings() {
             </div>
             <span className="text-xs bg-gray-100 text-gray-500 px-2.5 py-1 rounded-full font-medium">Coming Soon</span>
           </div>
-          <p className="text-sm text-gray-500">Register a URL to receive call completion notifications. Vetty will POST structured results to your endpoint within seconds of call completion.</p>
+          <p className="text-sm text-gray-500">Register a URL to receive call completion notifications. AgentForge will POST structured results to your endpoint within seconds of call completion.</p>
         </div>
 
         {/* MCP */}
@@ -64,7 +64,7 @@ export default function Settings() {
             </div>
             <span className="text-xs bg-gray-100 text-gray-500 px-2.5 py-1 rounded-full font-medium">Coming Soon</span>
           </div>
-          <p className="text-sm text-gray-500">Connect Vetty Voice to any MCP-compatible AI assistant. Trigger verifications and retrieve results from Claude, Cursor, or any MCP client.</p>
+          <p className="text-sm text-gray-500">Connect AgentForge to any MCP-compatible AI assistant. Trigger verifications and retrieve results from Claude, Cursor, or any MCP client.</p>
         </div>
       </div>
     </div>

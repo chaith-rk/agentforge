@@ -1,7 +1,7 @@
-# Vetty Voice AI Platform
+# AgentForge Platform
 
 ## Project Overview
-AI voice agent platform for automated verification calls (employment, education, etc.). Built as an internal service at Vetty (background screening company). The platform supports multiple agent types via YAML configuration — adding a new agent or modifying fields requires zero code changes.
+AI voice agent platform for automated verification calls (employment, education, etc.). Built as an internal service at AgentForge (background screening company). The platform supports multiple agent types via YAML configuration — adding a new agent or modifying fields requires zero code changes.
 
 ## Key Documents
 - **`docs/GRAND_PLAN.md`** — Full MVP build plan (pages, API contracts, build order)

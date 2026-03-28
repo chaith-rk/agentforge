@@ -71,7 +71,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
 
 app = FastAPI(
-    title="Vetty Voice AI Platform",
+    title="AgentForge Platform",
     description="AI voice agent platform for automated employment verification calls",
     version="0.1.0",
     lifespan=lifespan,

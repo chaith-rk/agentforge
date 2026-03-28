@@ -1,6 +1,6 @@
 """Dashboard statistics API endpoint.
 
-Provides aggregate call statistics for the Vetty Voice platform dashboard.
+Provides aggregate call statistics for the AgentForge platform dashboard.
 Stats are computed directly from the SQLite event store at query time.
 """
 

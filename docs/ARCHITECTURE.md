@@ -1,4 +1,4 @@
-# Architecture — Vetty Voice AI Platform
+# Architecture — AgentForge Platform
 
 **Version:** 1.0
 **Date:** 2026-03-14

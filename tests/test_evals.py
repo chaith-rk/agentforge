@@ -49,7 +49,7 @@ class TestRecordedLineDisclosureEval:
     async def test_passes_when_disclosure_in_first_turn(self) -> None:
         call_data = {
             "transcript": _transcript(
-                "Hi, I'm calling from Vetty on a recorded line. This is an employment verification.",
+                "Hi, I'm calling from AgentForge on a recorded line. This is an employment verification.",
                 "May I speak to an authorized person?",
             )
         }
@@ -61,7 +61,7 @@ class TestRecordedLineDisclosureEval:
     async def test_passes_when_disclosure_in_second_turn(self) -> None:
         call_data = {
             "transcript": _transcript(
-                "Hi, I'm calling from Vetty.",
+                "Hi, I'm calling from AgentForge.",
                 "This is on a recorded line — employment verification of John Doe.",
             )
         }
@@ -73,7 +73,7 @@ class TestRecordedLineDisclosureEval:
     async def test_fails_when_disclosure_missing(self) -> None:
         call_data = {
             "transcript": _transcript(
-                "Hi, I'm calling from Vetty.",
+                "Hi, I'm calling from AgentForge.",
                 "I need to verify employment for John Doe.",
             )
         }
@@ -87,7 +87,7 @@ class TestRecordedLineDisclosureEval:
         """Disclosure in the third agent turn does not satisfy the requirement."""
         call_data = {
             "transcript": _transcript(
-                "Hi, I'm calling from Vetty.",
+                "Hi, I'm calling from AgentForge.",
                 "May I speak to HR?",
                 "Just to note, this is on a recorded line.",
             )
@@ -102,7 +102,7 @@ class TestRecordedLineDisclosureEval:
         call_data = {
             "transcript": [
                 {"role": "user", "content": "Hello?"},
-                {"role": "agent", "content": "Hi, calling from Vetty on a recorded line."},
+                {"role": "agent", "content": "Hi, calling from AgentForge on a recorded line."},
                 {"role": "user", "content": "Sure, how can I help?"},
             ]
         }
@@ -360,7 +360,7 @@ class TestEvalRunner:
     async def test_run_all_returns_result_for_every_eval(self) -> None:
         runner = EvalRunner()
         call_data = {
-            "transcript": _transcript("Hi, calling from Vetty on a recorded line."),
+            "transcript": _transcript("Hi, calling from AgentForge on a recorded line."),
             "collected_data": {
                 "verifier_name": "Jane",
                 "job_title_confirmed": "Engineer",
@@ -377,7 +377,7 @@ class TestEvalRunner:
     async def test_summary_computes_pass_rate(self) -> None:
         runner = EvalRunner()
         call_data = {
-            "transcript": _transcript("Hi, calling from Vetty on a recorded line."),
+            "transcript": _transcript("Hi, calling from AgentForge on a recorded line."),
             "collected_data": {
                 "verifier_name": "Jane",
                 "job_title_confirmed": "Engineer",

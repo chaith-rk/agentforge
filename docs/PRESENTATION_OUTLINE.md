@@ -1,4 +1,4 @@
-# Leadership Presentation Outline — Vetty Voice AI Platform
+# Leadership Presentation Outline — AgentForge Platform
 
 **Purpose:** Secure budget approval and time allocation for the Voice AI Platform.
 **Audience:** Manager (security/compliance-focused), DevOps, Engineering leadership
@@ -151,7 +151,7 @@
 ### Post-POC (If Approved)
 - Production deployment
 - Education + reference check agents
-- Integration with Vetty's systems
+- Integration with AgentForge's systems
 - Multi-channel orchestration
 
 ---

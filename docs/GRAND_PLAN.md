@@ -1,4 +1,4 @@
-# Grand Plan — Vetty Voice AI Platform MVP
+# Grand Plan — AgentForge Platform MVP
 
 **Version:** 2.0
 **Date:** 2026-03-25
@@ -83,7 +83,7 @@ Automated quality checks on every call.
 ### Phase A: Backend API Completion [WS1]
 **Goal:** All API endpoints working, returning correct data.
 
-#### A1. Align data model to actual Vetty workflow
+#### A1. Align data model to actual AgentForge workflow
 The input/output fields must match the candidate intake form and Prashant's verification process.
 
 **Call Initiation Input:**
@@ -201,7 +201,7 @@ Store results in `eval_results` table: `call_id, eval_name, passed (bool), detai
 #### B1. Project setup & layout
 - React app with routing (React Router)
 - Sidebar navigation: Dashboard, Agents, Call History, Evals, API, Settings
-- Top bar with Vetty branding
+- Top bar with AgentForge branding
 - Responsive layout (desktop-first, but not broken on tablet)
 
 #### B2. Dashboard page (home)
@@ -311,13 +311,13 @@ Three sections, updating in real-time via WebSocket:
 - **Batch API** — "Coming Soon" badge
   - "Upload CSV with multiple verifications, receive results via webhook"
 - **MCP Server** — "Coming Soon" badge
-  - "Connect Vetty Voice to any MCP-compatible AI assistant"
+  - "Connect AgentForge to any MCP-compatible AI assistant"
 
 #### B9. Settings page
 - API key display (masked, copy button)
 - Webhook URL configuration (text input + test button) — "Coming Soon"
 - MCP Server connection card — "Coming Soon"
-  - One-liner: "Connect Vetty Voice to any MCP-compatible AI assistant for verification workflows"
+  - One-liner: "Connect AgentForge to any MCP-compatible AI assistant for verification workflows"
 
 ---
 

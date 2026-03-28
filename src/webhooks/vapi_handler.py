@@ -178,7 +178,7 @@ async def handle_assistant_request(payload: dict[str, Any]) -> dict[str, Any]:
                 "temperature": config.voice_config.temperature,
             },
             "firstMessage": (
-                f"Hi, my name is Sarah. I'm calling from Vetty on a recorded line. "
+                f"Hi, my name is Sarah. I'm calling from AgentForge on a recorded line. "
                 f"This call is regarding employment verification of {subject_name}. "
                 f"May I speak to an authorized person who can verify employment?"
             ),
@@ -219,7 +219,7 @@ def _build_dynamic_system_prompt(
     else:
         # Build a minimal prompt from config
         base_prompt = (
-            f"You are a {config.agent_name} calling on behalf of Vetty, "
+            f"You are a {config.agent_name} calling on behalf of AgentForge, "
             f"a background screening company.\n\n"
             f"# Candidate: {subject_name}\n"
         )

@@ -1,4 +1,4 @@
-# Product Requirements Document — Vetty Voice AI Platform
+# Product Requirements Document — AgentForge Platform
 
 **Version:** 1.0
 **Author:** Chaitanya Rajkumar
@@ -9,7 +9,7 @@
 
 ## 1. Executive Summary
 
-The Vetty Voice AI Platform automates outbound employment verification phone calls — the single most time-intensive step in Vetty's background screening workflow. An AI voice agent follows Vetty's exact verification script, collects structured data, and produces audit-ready verification records.
+The AgentForge Platform automates outbound employment verification phone calls — the single most time-intensive step in AgentForge's background screening workflow. An AI voice agent follows AgentForge's exact verification script, collects structured data, and produces audit-ready verification records.
 
 The platform is designed as a **multi-agent system**: the employment verification agent is the first module, but the architecture supports education verification, reference checks, and other agent types through YAML configuration — no code changes required.
 
@@ -40,7 +40,7 @@ The verification call is **highly structured** (confirm/deny against known data 
 
 An AI voice agent that:
 1. **Initiates outbound calls** to employers via Vapi telephony
-2. **Follows Vetty's verification script** (based on Operations Manager Prashant Singh's workflow)
+2. **Follows AgentForge's verification script** (based on Operations Manager Prashant Singh's workflow)
 3. **Confirms candidate details** using a confirm/deny approach (not open-ended questioning)
 4. **Records structured data** for every field verified
 5. **Handles edge cases**: third-party redirects, no record, limited policy, hostile verifiers
@@ -224,7 +224,7 @@ Only exact matches across ALL fields = verified/clear. Any discrepancy, no matte
 ### Near-Term (Post-POC)
 - Education verification agent (YAML config)
 - Reference check agent (YAML config)
-- Integration with Vetty's case management system
+- Integration with AgentForge's case management system
 - Production deployment on cloud infrastructure
 
 ### Medium-Term (Platform)

@@ -1,4 +1,4 @@
-# Vapi Setup (Vetty Voice Platform)
+# Vapi Setup (AgentForge Platform)
 
 This guide configures Vapi for this repository and validates the local webhook.
 

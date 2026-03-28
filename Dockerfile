@@ -1,4 +1,4 @@
-# Multi-stage Dockerfile for Vetty Voice AI Platform
+# Multi-stage Dockerfile for AgentForge Platform
 # Stage 1: Build dependencies
 # Stage 2: Slim runtime image
 
@@ -14,7 +14,7 @@ RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
 FROM python:3.11-slim
 
 # Security: run as non-root user
-RUN groupadd -r vetty && useradd -r -g vetty -d /app -s /sbin/nologin vetty
+RUN groupadd -r agentforge && useradd -r -g agentforge -d /app -s /sbin/nologin agentforge
 
 WORKDIR /app
 
@@ -27,10 +27,10 @@ COPY agents/ ./agents/
 COPY prompts/ ./prompts/
 
 # Create data directory for SQLite
-RUN mkdir -p /app/data && chown -R vetty:vetty /app
+RUN mkdir -p /app/data && chown -R agentforge:agentforge /app
 
 # Switch to non-root user
-USER vetty
+USER agentforge
 
 EXPOSE 8000
 

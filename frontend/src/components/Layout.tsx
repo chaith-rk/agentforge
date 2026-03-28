@@ -36,7 +36,7 @@ export function Layout({ children }: Props) {
             <Mic className="w-4 h-4 text-white" />
           </div>
           <div>
-            <div className="text-white font-semibold text-sm leading-tight">Vetty Voice</div>
+            <div className="text-white font-semibold text-sm leading-tight">AgentForge</div>
             <div className="text-slate-400 text-xs">Command Center</div>
           </div>
         </div>
@@ -64,7 +64,7 @@ export function Layout({ children }: Props) {
 
         {/* Footer */}
         <div className="px-4 py-3 border-t border-slate-700">
-          <div className="text-slate-500 text-xs">Vetty Inc. · v0.1.0</div>
+          <div className="text-slate-500 text-xs">AgentForge Inc. · v0.1.0</div>
         </div>
       </aside>
 

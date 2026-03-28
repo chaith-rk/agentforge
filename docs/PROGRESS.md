@@ -1,4 +1,4 @@
-# Progress Tracker — Vetty Voice AI Platform
+# Progress Tracker — AgentForge Platform
 
 **Last Updated:** 2026-03-25
 

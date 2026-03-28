@@ -1,4 +1,5 @@
-const API_BASE = '/api'
+const API_BASE = 'http://localhost:8000/api'
+const API_KEY = 'caf1480bd07a54157b19d71611798138294b5a45770fd94e'
 
 export interface CallStats {
   total_calls: number
@@ -90,7 +91,7 @@ export interface InitiateCallRequest {
 
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
-    headers: { 'Content-Type': 'application/json', 'X-API-Key': 'dev-key', ...((options?.headers as Record<string, string>) ?? {}) },
+    headers: { 'Content-Type': 'application/json', 'X-API-Key': API_KEY, ...((options?.headers as Record<string, string>) ?? {}) },
     ...options,
   })
   if (!res.ok) {
