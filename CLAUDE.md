@@ -14,13 +14,13 @@ AI voice agent platform for automated verification calls (employment, education,
 - **Backend:** Python 3.11+, async FastAPI
 - **Voice:** Vapi (telephony + STT + TTS + LLM orchestration)
 - **Database:** SQLite with event sourcing (aiosqlite)
-- **Frontend:** React + TypeScript + Vite + Tailwind + shadcn/ui (planned, not started)
+- **Frontend:** React 19 + TypeScript + Vite + Tailwind 4 + shadcn/ui (8 pages, live transcript, WebSocket)
 - **Config:** YAML agent definitions validated by Pydantic
-- **Deployment:** Docker, docker-compose
+- **Deployment:** Railway (backend) + Vercel (frontend), Docker
 
 ## Multi-Agent Architecture
 - **API is agent-agnostic:** `POST /api/calls/initiate` accepts `agent_config_id` + `candidate_claims: dict[str, Any]`. No agent-specific fields in the API layer.
-- **System prompt is dynamic:** `handle_assistant_request` webhook builds prompts from YAML config + candidate data per call. Vapi dashboard is fallback only.
+- **System prompt is dynamic:** Inline assistant config built at call time from YAML config + candidate data. Passed directly to Vapi in the create call payload (no assistant-request webhook flow).
 - **Status auto-derived:** `FieldVerification.status` property computes `verified`/`review_needed`/`unable_to_verify` using the Apple-to-Apple rule (exact match only = verified, any difference = review_needed).
 - **YAML fields drive everything:**
   - `question` → AI asks this during the call
@@ -46,11 +46,17 @@ AI voice agent platform for automated verification calls (employment, education,
 - **ALWAYS** use parameterized queries. No string interpolation in SQL.
 - **NEVER** expose internal errors to API consumers. Return generic error messages.
 
+## Vapi Integration Notes
+- **API endpoint:** `POST https://api.vapi.ai/call` (not `/call/phone`)
+- **Inline assistant config:** Must include `model` (with `provider`, `model`, `messages`, `tools`), `voice`, `firstMessage`, and `serverUrl` inside the `assistant` object
+- **Webhook events:** Vapi sends `conversation-update` (full transcript), `tool-calls` (OpenAI format with `function.name`/`function.arguments`), `end-of-call-report` (final transcript in `artifact.messages`), `status-update`, `speech-update`
+- **Tool call format:** `{id, type: "function", function: {name, arguments}}` — arguments is a JSON string
+- **Phone numbers:** Must be E.164 format with `+` prefix
+
 ## Testing
-- Unit tests in `tests/unit/`
-- Integration tests in `tests/integration/`
-- Red team scenarios in `tests/red_team/`
-- Run: `pytest tests/`
+- Tests in `tests/` — run: `pytest tests/`
+- 33 tests: 2 API call tests + 31 eval tests
+- Test gaps: webhook handler, API endpoints, agent config loading, event store
 
 ## Git Conventions
 - Branch naming: `feature/`, `fix/`, `docs/`
