@@ -9,7 +9,7 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    VETTY VOICE AI PLATFORM                       │
+│                  AGENTFORGE VOICE AI PLATFORM                    │
 │                                                                 │
 │  ┌─────────────┐   ┌──────────────────┐   ┌────────────────┐  │
 │  │ Agent Config │──▶│  Runtime Engine   │──▶│     Vapi       │  │

@@ -18,7 +18,7 @@
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
-│                     VETTY VOICE COMMAND CENTER                    │
+│                   AGENTFORGE VOICE COMMAND CENTER                 │
 │                                                                  │
 │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────────────┐ │
 │  │ Dashboard │  │ New Call  │  │  Agents  │  │    API Docs      │ │
@@ -84,7 +84,7 @@ Automated quality checks on every call.
 **Goal:** All API endpoints working, returning correct data.
 
 #### A1. Align data model to actual AgentForge workflow
-The input/output fields must match the candidate intake form and Prashant's verification process.
+The input/output fields must match the candidate intake form and the operations team's verification process.
 
 **Call Initiation Input:**
 ```json
@@ -322,7 +322,7 @@ Three sections, updating in real-time via WebSocket:
 ---
 
 ### Phase C: Vapi Integration [WS3]
-**Goal:** AI assistant that follows Prashant's exact workflow.
+**Goal:** AI assistant that follows the operations team's exact workflow.
 
 #### C1. Update system prompt with candidate details injection
 - Template variables filled at call initiation time

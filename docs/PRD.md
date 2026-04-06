@@ -40,7 +40,7 @@ The verification call is **highly structured** (confirm/deny against known data 
 
 An AI voice agent that:
 1. **Initiates outbound calls** to employers via Vapi telephony
-2. **Follows AgentForge's verification script** (based on Operations Manager Prashant Singh's workflow)
+2. **Follows AgentForge's verification script** (based on the Operations Manager's workflow)
 3. **Confirms candidate details** using a confirm/deny approach (not open-ended questioning)
 4. **Records structured data** for every field verified
 5. **Handles edge cases**: third-party redirects, no record, limited policy, hostile verifiers
@@ -56,7 +56,7 @@ An AI voice agent that:
 - **With platform:** Reviews AI-completed verifications, handles only exception cases
 - **Key need:** Trust that the AI follows the correct script and records accurate data
 
-### Operations Manager (Prashant Singh)
+### Operations Manager
 - **Currently:** Trains analysts on verification script, monitors quality
 - **With platform:** Configures agent behavior via YAML, reviews call outcomes
 - **Key need:** Confidence that the AI matches the quality of trained analysts

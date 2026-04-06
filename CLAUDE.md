@@ -6,7 +6,7 @@ AI voice agent platform for automated verification calls (employment, education,
 ## Key Documents
 - **`docs/GRAND_PLAN.md`** — Full MVP build plan (pages, API contracts, build order)
 - **`docs/PROGRESS.md`** — Current status of all phases
-- **`docs/PRASHANT_WORKFLOW_INSIGHTS.md`** — Prashant Singh's verification workflow (the ground truth for how agents should behave)
+- **`docs/VERIFICATION_WORKFLOW_INSIGHTS.md`** — Operations team's verification workflow (the ground truth for how agents should behave)
 - **`docs/ARCHITECTURE.md`** — Component architecture and data flow
 - **`docs/PRD.md`** — Product requirements
 

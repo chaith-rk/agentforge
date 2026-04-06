@@ -1,7 +1,7 @@
-# Prashant Singh — Employment Verification Workflow Insights
+# Employment Verification Workflow Insights
 
-**Source:** Recorded walkthrough session with Prashant Singh (Operations Manager)
-**Transcript:** `/tmp/prashant_employment_verification.txt`
+**Source:** Recorded walkthrough session with the Operations Manager
+**Transcript:** `/tmp/employment_verification_walkthrough.txt`
 **Date:** Pre-2026-03-14
 
 ---
@@ -9,7 +9,7 @@
 ## Standard Call Script
 
 **Opening (exact wording):**
-> "Hi, my name is Prashant. I'm calling from AgentForge on a recorded line. This call is regarding employment verification of [candidate name]. May I speak to an authorized person who can verify employment?"
+> "Hi, my name is [Agent]. I'm calling from AgentForge on a recorded line. This call is regarding employment verification of [candidate name]. May I speak to an authorized person who can verify employment?"
 
 **Key elements that MUST be included:**
 1. Agent name
@@ -50,7 +50,7 @@
 - A field is **"Verified"** ONLY if the employer's answer is an **exact match** to the candidate's claim
 - Even **one day difference** in dates → "Review Needed"
 - Even **slight title variations** (e.g., "surgical tech" vs "surgical tech supervisor") → "Review Needed"
-- The entire file can only go **"Clear"** if ALL fields are marked "Verified" — which Prashant says is **rare**
+- The entire file can only go **"Clear"** if ALL fields are marked "Verified" — which is **rare** in practice
 - The voice agent's job is to **record exactly what the employer says** — the comparison/matching is downstream
 
 ---
@@ -65,7 +65,7 @@
 
 ---
 
-## Key Scenarios from Prashant
+## Key Scenarios
 
 ### 1. Third-Party Redirect
 - Employer says "We use The Work Number / Thomas & Company / CCC Verify"
@@ -115,7 +115,7 @@
 
 - **Phone:** Only call numbers published on Google that indicate they belong to the company
 - **Email:** Only email professional addresses (company domain). Never Gmail, Yahoo, Apple, etc.
-- **On recorded line:** If someone asks for candidate details to verify against, Prashant provides them (since email-based verification already provides this info)
+- **On recorded line:** If someone asks for candidate details to verify against, the analyst provides them (since email-based verification already provides this info)
 
 ---
 
@@ -143,7 +143,7 @@ Each scenario has a standardized note template:
 ---
 
 ## Quality Management
-- Prashant designed a QMS to audit recordings
+- The operations team designed a QMS to audit recordings
 - Can audit files to check if process was followed
 - Researchers can be penalized for not following protocol
 - Recording serves as backup evidence for disputes

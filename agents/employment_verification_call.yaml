@@ -458,6 +458,6 @@ data_schema:
 
 metadata:
   created_by: "Chaitanya Rajkumar"
-  based_on: "Prashant Singh operational workflow"
+  based_on: "Operations team verification workflow"
   domain: "employment_verification"
-  version_notes: "Initial POC based on Prashant's verification script"
+  version_notes: "Initial POC based on the operations team's verification script"

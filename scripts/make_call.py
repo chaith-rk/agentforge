@@ -56,7 +56,7 @@ async def make_call(
     company_name = company or DEFAULT_CANDIDATE["company"]
 
     print(f"\n{'='*60}")
-    print(f"  VETTY VOICE AI — Outbound Verification Call")
+    print(f"  AGENTFORGE — Outbound Verification Call")
     print(f"{'='*60}")
     print(f"  Calling:    {to_number}")
     print(f"  Candidate:  {candidate_name}")

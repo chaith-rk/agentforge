@@ -16,7 +16,7 @@
 - Bottleneck: verification calls are the #1 delay in our fulfillment cycle
 
 ### Data to Gather Before Presentation
-- [ ] Average daily verification call volume (ask Prashant)
+- [ ] Average daily verification call volume (ask Operations Manager)
 - [ ] Average call duration
 - [ ] Analyst hourly cost (fully loaded)
 - [ ] Current error/rework rate
@@ -30,7 +30,7 @@
 ## Slide 2: The Solution — AI Voice Agent
 
 ### Talking Points
-- AI agent follows Prashant's exact verification script
+- AI agent follows the Operations Manager's exact verification script
 - Confirm/deny approach — reads back candidate details, employer confirms
 - Not replacing analysts — augmenting. AI handles routine, humans handle exceptions
 - Every call produces a structured verification record with full audit trail
@@ -125,7 +125,7 @@
 
 ### Time Allocation
 - X% of your time for 4–6 weeks
-- Occasional input from Prashant for workflow validation
+- Occasional input from Operations Manager for workflow validation
 - DevOps: 2–3 hours for production deployment review
 
 ### ROI Projection
@@ -163,7 +163,7 @@
 | "What about PII/security?" | Hand them the threat model. PII encrypted, no PII in logs, HMAC webhooks, non-root container. |
 | "What if the AI says something wrong?" | State machine constrains behavior. Compliance checkpoints enforce rules. Every call recorded and auditable. |
 | "Can this scale?" | Async architecture, stateless backend, horizontally scalable. |
-| "Why not use an existing tool?" | Built on Prashant's actual workflow with our compliance requirements baked in. |
+| "Why not use an existing tool?" | Built on the operations team's actual workflow with our compliance requirements baked in. |
 | "What if Vapi changes pricing?" | Voice provider is one integration layer. Swapping providers doesn't rebuild the system. |
 | "You're a PM, can you maintain this?" | Industry-standard patterns. Every decision documented in ADRs. Any Python engineer can extend it. |
 
@@ -171,7 +171,7 @@
 
 ## Pre-Presentation Checklist
 
-- [ ] Gather call volume and cost data from Prashant
+- [ ] Gather call volume and cost data from Operations Manager
 - [ ] Calculate ROI with real numbers
 - [ ] Prepare fictional test data for demo (no real PII)
 - [ ] Dry run the live demo
