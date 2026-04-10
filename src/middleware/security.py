@@ -18,7 +18,7 @@ from typing import Any
 
 from fastapi import HTTPException, Request, status
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
-from starlette.responses import Response
+from starlette.responses import JSONResponse, Response
 
 from src.config.settings import settings
 
@@ -63,11 +63,12 @@ def validate_webhook_signature(payload: bytes, signature: str, secret: str) -> b
         secret: The shared webhook secret.
 
     Returns:
-        True if the signature is valid.
+        True if the signature is valid. Returns False if no secret
+        or signature was provided — the caller must decide how to
+        handle unauthenticated webhooks based on environment.
     """
-    if not secret:
-        # In development without a secret configured, log a warning
-        return True
+    if not secret or not signature:
+        return False
 
     expected = hmac.new(
         secret.encode(), payload, hashlib.sha256
@@ -90,9 +91,11 @@ def validate_webhook_secret(secret_header: str, auth_header: str, secret: str) -
 
     Returns:
         True when either auth mode matches the configured secret.
+        Returns False if no secret is configured — the caller must
+        decide how to handle missing-secret scenarios.
     """
     if not secret:
-        return True
+        return False
 
     if secret_header and hmac.compare_digest(secret_header, secret):
         return True
@@ -131,15 +134,25 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
         if request.url.path in self.EXEMPT_PATHS:
             return await call_next(request)
 
-        # Skip auth in development if no key configured
+        # No API key configured: fail closed in production, fail open in dev.
+        # This lets local development work without ceremony while preventing
+        # a misconfigured production deploy from exposing the API.
+        #
+        # Note: BaseHTTPMiddleware does not propagate HTTPException to the
+        # app's exception handlers, so we return JSONResponse directly.
         if not settings.api_key:
+            if settings.is_production:
+                return JSONResponse(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    content={"detail": "API authentication not configured"},
+                )
             return await call_next(request)
 
         api_key = request.headers.get("X-API-Key", "")
         if not hmac.compare_digest(api_key, settings.api_key):
-            raise HTTPException(
+            return JSONResponse(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid or missing API key",
+                content={"detail": "Invalid or missing API key"},
             )
 
         return await call_next(request)

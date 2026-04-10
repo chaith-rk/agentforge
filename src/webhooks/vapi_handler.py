@@ -50,8 +50,27 @@ async def handle_vapi_webhook(request: Request) -> dict[str, Any]:
     secret_header = request.headers.get("x-vapi-secret", "")
     auth_header = request.headers.get("authorization", "")
 
-    if settings.vapi_webhook_secret:
-        signature_valid = bool(signature) and validate_webhook_signature(
+    if not settings.vapi_webhook_secret:
+        # No secret configured. Fail closed in production — a misconfigured
+        # prod deploy must not accept unauthenticated webhooks. In dev we
+        # log a loud warning and allow the request through so local testing
+        # (ngrok, manual curl) is not blocked.
+        if settings.is_production:
+            logger.error(
+                "webhook_secret_not_configured_in_production",
+                path="/webhooks/vapi",
+            )
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Webhook authentication not configured",
+            )
+        logger.warning(
+            "webhook_secret_not_configured",
+            path="/webhooks/vapi",
+            environment=settings.environment.value,
+        )
+    else:
+        signature_valid = validate_webhook_signature(
             body, signature, settings.vapi_webhook_secret
         )
         secret_valid = validate_webhook_secret(
@@ -150,7 +169,6 @@ async def handle_assistant_request(payload: dict[str, Any]) -> dict[str, Any]:
     logger.info(
         "assistant_request_received",
         agent_config_id=agent_config_id,
-        subject_name=subject_name,
     )
 
     if not agent_config_id:
@@ -362,13 +380,6 @@ async def handle_function_call(payload: dict[str, Any]) -> dict[str, Any]:
 async def handle_tool_calls(payload: dict[str, Any]) -> dict[str, Any]:
     """Handle modern tool-calls message with one or more tool invocations."""
     message = payload.get("message", {})
-
-    logger.info(
-        "tool_calls_payload_debug",
-        message_keys=list(message.keys()),
-        tool_call_list_sample=str(message.get("toolCallList", [])[:1])[:500],
-        tool_with_sample=str(message.get("toolWithToolCallList", [])[:1])[:500],
-    )
 
     tool_call_list = message.get("toolCallList", []) or []
     tool_with_tool_call_list = message.get("toolWithToolCallList", []) or []
@@ -583,6 +594,14 @@ async def handle_record_data_point(
     field_name = parameters.get("field_name", "")
     value = parameters.get("value", "")
     confidence = parameters.get("confidence", "high")
+
+    if not field_name:
+        logger.warning(
+            "record_data_point_missing_field_name",
+            session_id=session_id,
+            parameters_keys=list(parameters.keys()),
+        )
+        return "Error: field_name is required"
 
     if session_id:
         cm = _get_call_manager()

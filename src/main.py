@@ -39,7 +39,7 @@ structlog.configure(
 logger = structlog.get_logger(__name__)
 
 # Global instances — shared across the application
-event_store = EventStore()
+event_store = EventStore(db_path=settings.database_path)
 call_manager = CallManager(event_store=event_store)
 
 

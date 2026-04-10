@@ -193,7 +193,6 @@ async def initiate_call(request: InitiateCallRequest) -> CallResponse:
         "call_initiated",
         session_id=session_id,
         agent_config_id=request.agent_config_id,
-        subject_name=request.subject_name,
         vapi_call_id=vapi_call_id,
     )
 

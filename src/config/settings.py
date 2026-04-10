@@ -40,7 +40,11 @@ class Settings(BaseSettings):
     vapi_server_url: str = ""  # webhook URL Vapi calls back (ngrok or hosted)
 
     # Database
+    # database_url kept for SQLAlchemy-style tooling compatibility.
+    # database_path is the actual filesystem path used by aiosqlite
+    # and is what Railway volumes should mount (e.g., /app/data/calls.db).
     database_url: str = "sqlite+aiosqlite:///data/calls.db"
+    database_path: str = "data/calls.db"
 
     # API security
     api_key: str = ""
