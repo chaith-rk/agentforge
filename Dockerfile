@@ -13,7 +13,7 @@ RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
 # --- Runtime Stage ---
 FROM python:3.11-slim
 
-# Security: run as non-root user
+# Security: create non-root user (entrypoint drops to this user after fixing perms)
 RUN groupadd -r agentforge && useradd -r -g agentforge -d /app -s /sbin/nologin agentforge
 
 WORKDIR /app
@@ -25,12 +25,10 @@ COPY --from=builder /install /usr/local
 COPY src/ ./src/
 COPY agents/ ./agents/
 COPY prompts/ ./prompts/
+COPY entrypoint.sh ./entrypoint.sh
 
 # Create data directory for SQLite
-RUN mkdir -p /app/data && chown -R agentforge:agentforge /app
-
-# Switch to non-root user
-USER agentforge
+RUN mkdir -p /app/data && chown -R agentforge:agentforge /app && chmod +x /app/entrypoint.sh
 
 EXPOSE 8000
 
@@ -38,4 +36,5 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD python -c "import os,urllib.request; urllib.request.urlopen(f'http://localhost:{os.environ.get(\"PORT\",8000)}/health')" || exit 1
 
-CMD ["sh", "-c", "uvicorn src.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+# Run as root initially so entrypoint can fix volume permissions, then drop to agentforge
+CMD ["/app/entrypoint.sh"]
