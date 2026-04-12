@@ -12,73 +12,84 @@ Do these in order. Each step should take ~5 min.
 
 ### 0.1 Generate prod secrets
 
-Already generated for you in this session — copy these into Railway now,
-DO NOT commit them anywhere:
-
-```
-PII_ENCRYPTION_KEY=PjJi-NZIQY3ukjZzkcDSd0lz0XGSsfdAShLYmoCqfX4=
-API_KEY=8K2ogRLvaHeh93Vfc-bqUoK7maG5qnE8O8niND7zHVk
-VAPI_WEBHOOK_SECRET=KVXkZaesWkGX-f_g1IlEO5bcAjEyfDKSW6kLpAj-8mE
-```
-
-If you need to regenerate them later:
+You need three secrets. Generate them locally, store in a password manager
+labeled "AgentForge prod", and do **not** commit them anywhere.
 
 ```bash
-venv/bin/python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
-venv/bin/python -c "import secrets; print(secrets.token_urlsafe(32))"
+# PII encryption key (Fernet format) — LOSING THIS MAKES ENCRYPTED DATA UNRECOVERABLE
+venv/bin/python -c "from cryptography.fernet import Fernet; print('PII_ENCRYPTION_KEY=' + Fernet.generate_key().decode())"
+
+# Dashboard API key
+venv/bin/python -c "import secrets; print('API_KEY=' + secrets.token_urlsafe(32))"
+
+# Vapi webhook HMAC secret (must also be set in Vapi dashboard)
+venv/bin/python -c "import secrets; print('VAPI_WEBHOOK_SECRET=' + secrets.token_urlsafe(32))"
 ```
 
-**Store these in a password manager immediately.** The PII encryption key
-in particular — if you lose it, all encrypted fields in the event store
-become unrecoverable.
+Store all three in a password manager immediately. The `PII_ENCRYPTION_KEY`
+in particular: if you lose it, every encrypted field in the event store
+becomes unrecoverable and there is no recovery path.
+
+You also need two values from the Vapi dashboard (https://dashboard.vapi.ai):
+
+- `VAPI_API_KEY` — under **API Keys**
+- `VAPI_PHONE_NUMBER_ID` — under **Phone Numbers**, the UUID of your number
 
 ### 0.2 Railway backend deploy
 
-1. Railway dashboard → your project → backend service → **Variables** tab.
-   Paste this block (replace the three Vapi values with real ones from the
-   Vapi dashboard):
+1. Railway dashboard → your project. If there is no service yet (empty
+   project with only project-level Variables), click **+ New** →
+   **GitHub Repo** → select `chaith-rk/agentforge-platform`. Railway
+   reads `railway.json` and starts a Dockerfile build. The first build
+   may crash on startup — that's expected, env vars aren't set yet.
+
+2. Service → **Settings** → **Networking** → **Generate Domain**.
+   Note the domain (e.g. `agentforge-production-abc.up.railway.app`) —
+   you'll need it in steps below and in the Vercel deploy.
+
+3. Service → **Variables** tab. Paste this block. Substitute the three
+   generated secrets from §0.1, the two Vapi values from the Vapi
+   dashboard, and `<railway-backend-domain>` from step 2:
 
    ```
    ENVIRONMENT=production
    LOG_LEVEL=INFO
 
-   # Secrets from 0.1
-   PII_ENCRYPTION_KEY=PjJi-NZIQY3ukjZzkcDSd0lz0XGSsfdAShLYmoCqfX4=
-   API_KEY=8K2ogRLvaHeh93Vfc-bqUoK7maG5qnE8O8niND7zHVk
-   VAPI_WEBHOOK_SECRET=KVXkZaesWkGX-f_g1IlEO5bcAjEyfDKSW6kLpAj-8mE
+   # From §0.1 (paste from your password manager)
+   PII_ENCRYPTION_KEY=<generated Fernet key>
+   API_KEY=<generated token>
+   VAPI_WEBHOOK_SECRET=<generated token>
 
    # From the Vapi dashboard (https://dashboard.vapi.ai)
    VAPI_API_KEY=<paste from Vapi dashboard → API Keys>
    VAPI_PHONE_NUMBER_ID=<paste from Vapi dashboard → Phone Numbers>
    VAPI_SERVER_URL=https://<railway-backend-domain>/webhooks/vapi
 
-   # Database — must point at the volume mount (see step 0.3)
+   # Database — must point at the volume mount (see step 0.3 below)
    DATABASE_PATH=/app/data/calls.db
 
-   # CORS — lock down to your Vercel domain once you know it
-   CORS_ORIGINS=["https://<your-vercel-domain>"]
+   # CORS — start permissive, lock down in §0.4 once Vercel is deployed
+   CORS_ORIGINS=["http://localhost:5173"]
    ```
 
    Notes:
-   - `VAPI_SERVER_URL` references your Railway domain. You may not know the
-     domain until the first deploy completes. It's fine to set it after
-     the first deploy and redeploy — Vapi only reads the URL from webhook
-     calls we make, not this env var (the env var is a convenience for
-     reference, not functional wiring).
    - `CORS_ORIGINS` must be valid JSON (brackets + quoted strings).
+     A malformed value will crash the app on startup.
+   - `VAPI_SERVER_URL` is a convenience reference only — the backend
+     does not call this URL. What matters is that Vapi is configured
+     to call `https://<railway-backend-domain>/webhooks/vapi`.
 
-2. Railway → service → **Settings** → **Volumes** → **Add Volume**:
+4. Service → **Settings** → **Volumes** → **+ New Volume**:
    - Mount path: `/app/data`
    - Size: 1 GB is plenty for MVP
    - This is **critical** — without a volume, SQLite data is wiped on
-     every deploy. The app will silently start with an empty DB.
+     every deploy. The app will silently start with an empty DB and
+     there is no recovery.
 
-3. Redeploy the service (push to main or click Redeploy).
+5. Redeploy the service (Deployments tab → three-dot menu → Redeploy).
+   Wait for the deploy to show green/Active.
 
-4. Note the Railway public domain (something like
-   `agentforge-backend-production.up.railway.app`).
-
-5. Verify:
+6. Verify:
 
    ```bash
    curl https://<railway-domain>/health

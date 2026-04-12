@@ -1,16 +1,18 @@
 # Progress Tracker — AgentForge Platform
 
-**Last Updated:** 2026-03-28
+**Last Updated:** 2026-04-10
 
 ## Current Status
 
-**End-to-end call flow working.** Outbound calls via Vapi connect, AI agent
-conducts verification, live transcript streams to the frontend via WebSocket.
-Platform is deployed on Railway (backend) with Vercel deployment pending
-(frontend). Production deployment config is in place.
+**Code is production-ready; deployment is paused.** End-to-end call flow
+works locally. Today's session hardened the codebase for prod (fail-closed
+auth, volume-aware SQLite, PII redaction in logs, 105 tests) and produced
+a full deploy runbook at `docs/RUNBOOK.md`. The Railway project exists
+but has no backend service yet. Vercel not started.
 
-**Next:** Complete Vercel frontend deployment, test verification results table
-in production, write comprehensive automated tests.
+**Next (separate session):** Work through `docs/RUNBOOK.md` §0.2 onward —
+create Railway backend service from GitHub, mount volume at `/app/data`,
+set env vars, deploy, smoke test, then Vercel and Vapi wiring.
 
 ---
 
@@ -87,21 +89,35 @@ in production, write comprehensive automated tests.
 
 - [x] 4 code-based evals: `RecordedLineDisclosureEval`, `CompletenessEval`, `StatusAccuracyEval`, `FormatValidationEval`
 - [x] `EvalRunner` with `run_all()` and `summary()` methods
-- [x] 33 tests passing (31 eval tests + 2 API call tests)
+- [x] `EvalRunner` wired into `complete_call()` — every completed call is scored and results are persisted via `EVAL_COMPLETED` event + snapshot
+- [x] 105 tests passing (31 eval + 2 API call + 37 agent config + 18 event store + 17 webhook handler tests)
 - [ ] LLM-based evals: stubs created, not implemented
-- [ ] Eval integration with `complete_call()` flow
 
 ### Phase 7: Production Deployment 🟡
-**Status:** In progress.
+**Status:** Code hardened for prod. Deployment paused — to resume in a separate session using `docs/RUNBOOK.md` as the single source of truth.
 
+Code readiness (done 2026-04-10):
 - [x] Dockerfile (multi-stage, non-root user, health check)
 - [x] `.dockerignore` for smaller images
 - [x] `railway.json` deployment config
-- [x] Railway backend deployed (older commit active, latest needs env vars)
-- [ ] Railway env vars configured + latest commit deployed
-- [ ] Vercel frontend deployment
-- [ ] CORS origins updated for production domain
-- [ ] Vapi dashboard Server URL updated to production
+- [x] Webhook HMAC auth + API key middleware fail closed in production when secrets missing (previously fail-open, a deploy-blocking vulnerability)
+- [x] `settings.database_path` wired into `EventStore` so Railway volume mounts at `/app/data` actually persist writes
+- [x] PII scrub of structured logs: removed `subject_name` from `call_initiated` and `assistant_request_received`; removed `tool_calls_payload_debug` dump
+- [x] Bug fix: `record_data_point` with missing `field_name` now returns an error instead of persisting empty-keyed data
+- [x] Webhook handler test suite (17 tests) covering auth modes, message dispatch, OpenAI tool-call format, EvalRunner wiring, fail-closed behavior
+- [x] API endpoint test suite (18 tests) covering `/health`, `/api/agents/*`, `/api/calls/*`, middleware fail-closed
+- [x] `frontend/.env.example` documenting `VITE_API_BASE`, `VITE_WS_HOST`, `VITE_API_KEY`
+- [x] Production runbook at `docs/RUNBOOK.md` — one-shot deploy guide + ops reference
+
+Deploy actions remaining (to do next session):
+- [ ] Create backend service inside the Railway project (from GitHub repo)
+- [ ] Mount persistent volume at `/app/data` (critical — SQLite wipes on deploy without this)
+- [ ] Set Railway env vars per runbook §0.2
+- [ ] Smoke test backend: `/health`, `/api/agents` with and without API key
+- [ ] Create Vercel project with `VITE_*` env vars pointing at Railway domain
+- [ ] Update Railway `CORS_ORIGINS` to include Vercel domain
+- [ ] Update Vapi dashboard Server URL + Secret to Railway values
+- [ ] End-to-end prod smoke test with a real outbound call
 
 ### Phase 8: Red-Teaming 🔲
 **Status:** Not started — 11 scenarios defined.
@@ -118,6 +134,18 @@ in production, write comprehensive automated tests.
 6. **Deployment:** Railway (backend, persistent server for WebSockets + webhooks) + Vercel (frontend, static React build).
 
 ---
+
+## Bugs Fixed / Hardening (2026-04-10)
+
+| Issue | Impact | Fix |
+|-----|--------|-----|
+| Webhook HMAC auth returned True when secret unset | Prod deploy with missing `VAPI_WEBHOOK_SECRET` would accept unauthenticated webhooks | `validate_webhook_signature` / `validate_webhook_secret` now return False on missing secret; handler fails closed with 503 in production, fails open with warning in dev |
+| API key middleware returned 200 when `API_KEY` unset | Prod deploy with missing `API_KEY` would expose the dashboard API | Middleware returns 503 in production when `API_KEY` is missing |
+| BaseHTTPMiddleware was raising `HTTPException` | FastAPI doesn't catch middleware exceptions → 500 instead of 401/503 | Middleware now returns `JSONResponse` directly |
+| `EventStore` used hardcoded `data/calls.db` path, ignoring settings | Railway volume mount couldn't redirect the DB location | Added `settings.database_path`; `main.py` passes it to `EventStore(db_path=...)` |
+| `record_data_point` handler persisted empty-keyed data on malformed tool args | Noise in collected data, potential empty UI rows | Handler now returns error string when `field_name` is empty |
+| `subject_name` logged in `call_initiated` + `assistant_request_received` | Names are PII per project rules | Removed from structured log calls |
+| `tool_calls_payload_debug` dumped raw 500-char tool call payloads per call | Employer-spoken PII leaked to logs on every tool call | Debug log removed entirely |
 
 ## Bugs Fixed (2026-03-28)
 
