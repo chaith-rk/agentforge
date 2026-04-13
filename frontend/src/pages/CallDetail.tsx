@@ -31,9 +31,11 @@ export default function CallDetail() {
     api.getCallResult(id)
       .then((res) => {
         setResult(res)
-        const completed = res.status !== 'in_progress'
-        setIsActiveCall(!completed)
-        if (completed) {
+        // The active call result has status: "in_progress" explicitly set.
+        // Snapshots have outcome field (e.g. "completed", "no_record", etc.) but no status.
+        const isActive = res.status === 'in_progress'
+        setIsActiveCall(isActive)
+        if (!isActive) {
           // Load transcript from events for completed calls
           api.getCallTranscript(id).then(setHistoricalTranscript).catch(() => null)
         }

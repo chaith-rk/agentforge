@@ -114,7 +114,7 @@ class VerificationRecord(BaseModel):
                 "field_name": fv.field_name,
                 "display_name": fv.display_name or fv.field_name,
                 "candidate_value": fv.candidate_value,
-                "verified_value": fv.employer_value,
+                "employer_value": fv.employer_value,
                 "status": fv.status,
                 "match": fv.match,
                 "note": fv.note,

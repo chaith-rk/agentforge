@@ -67,6 +67,7 @@ export interface Call {
 export interface CallResult {
   overall_status?: string
   status?: string
+  outcome?: string
   call_outcome?: string
   fields?: FieldVerification[]
   verifier_name?: string

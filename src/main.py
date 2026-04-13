@@ -6,6 +6,8 @@ and the call manager. Uses lifespan for clean startup/shutdown.
 
 from __future__ import annotations
 
+import logging
+import sys
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
@@ -22,6 +24,13 @@ from src.database.event_store import EventStore
 from src.engine.call_manager import CallManager
 from src.middleware.security import APIKeyMiddleware
 from src.webhooks.vapi_handler import router as vapi_router
+
+# Configure Python's logging so structlog output reaches stdout
+logging.basicConfig(
+    format="%(message)s",
+    stream=sys.stdout,
+    level=getattr(logging, settings.log_level.upper(), logging.INFO),
+)
 
 # Configure structured logging
 structlog.configure(
