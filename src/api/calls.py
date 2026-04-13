@@ -333,6 +333,13 @@ async def get_call_result(session_id: str) -> dict[str, Any]:
             detail=f"Session {session_id} not found",
         )
 
+    # If there's no active call in memory and no snapshot, the call
+    # is not active — it either completed while the app was restarting
+    # or was abandoned. Don't report it as in_progress.
+    if session.get("status") == "in_progress":
+        session["status"] = "unknown"
+        session["outcome"] = "unknown"
+
     return session
 
 
