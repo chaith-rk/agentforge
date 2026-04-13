@@ -290,8 +290,9 @@ async def get_verification_record(session_id: str) -> dict[str, Any]:
             detail=f"Call is still {session.get('status', 'in progress')}. Record available after completion.",
         )
 
-    # Return the snapshot
-    return session
+    # Return the snapshot if available, otherwise the session
+    snapshot = await event_store.get_snapshot(session_id)
+    return snapshot if snapshot else session
 
 
 @router.get("/{session_id}/result")
@@ -320,6 +321,11 @@ async def get_call_result(session_id: str) -> dict[str, Any]:
     # Fall back to snapshot stored at call completion
     from src.main import event_store
 
+    snapshot = await event_store.get_snapshot(session_id)
+    if snapshot:
+        return snapshot
+
+    # No snapshot — check if session exists at all
     session = await event_store.get_session(session_id)
     if not session:
         raise HTTPException(
@@ -328,6 +334,37 @@ async def get_call_result(session_id: str) -> dict[str, Any]:
         )
 
     return session
+
+
+@router.get("/{session_id}/transcript")
+async def get_call_transcript(session_id: str) -> list[dict[str, str]]:
+    """Get the transcript for a call, reconstructed from events."""
+    from src.main import event_store
+    from src.models.events import EventType
+
+    events = await event_store.get_events_for_session(session_id, EventType.TRANSCRIPT_UPDATED)
+    if not events:
+        # Check if session exists
+        session = await event_store.get_session(session_id)
+        if not session:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Session {session_id} not found",
+            )
+        return []
+
+    transcript = []
+    for event in events:
+        payload = event.get("payload_json", "{}")
+        if isinstance(payload, str):
+            import json
+            payload = json.loads(payload)
+        transcript.append({
+            "role": payload.get("role", "unknown"),
+            "content": payload.get("content", ""),
+            "timestamp": event.get("timestamp", ""),
+        })
+    return transcript
 
 
 @router.get("")

@@ -19,31 +19,57 @@ function useTimer(running: boolean) {
 
 export default function CallDetail() {
   const { id } = useParams<{ id: string }>()
-  const ws = useCallWebSocket(id ?? null)
-  const { transcript, collectedData, currentState, isConnected } = ws
-  const [stopped, setStopped] = useState(false)
-  const callCompleted = ws.callCompleted || stopped
-  const transcriptEnd = useRef<HTMLDivElement>(null)
+  const [isActiveCall, setIsActiveCall] = useState<boolean | null>(null)
   const [result, setResult] = useState<CallResult | null>(null)
-  const timer = useTimer(isConnected && !callCompleted)
+  const [historicalTranscript, setHistoricalTranscript] = useState<Array<{ role: string; content: string; timestamp: string }>>([])
+  const [stopped, setStopped] = useState(false)
+  const transcriptEnd = useRef<HTMLDivElement>(null)
+
+  // Check if this is an active or completed call on mount
+  useEffect(() => {
+    if (!id) return
+    api.getCallResult(id)
+      .then((res) => {
+        setResult(res)
+        const completed = res.status !== 'in_progress'
+        setIsActiveCall(!completed)
+        if (completed) {
+          // Load transcript from events for completed calls
+          api.getCallTranscript(id).then(setHistoricalTranscript).catch(() => null)
+        }
+      })
+      .catch(() => {
+        // If result not found, assume it might be active
+        setIsActiveCall(true)
+      })
+  }, [id])
+
+  // Only connect WebSocket for active calls
+  const ws = useCallWebSocket(isActiveCall ? (id ?? null) : null)
+  const { transcript: liveTranscript, collectedData, currentState, isConnected } = ws
+  const callCompleted = ws.callCompleted || stopped || isActiveCall === false
+  const timer = useTimer(isActiveCall === true && isConnected && !callCompleted)
+
+  // Use live transcript for active calls, historical for completed
+  const transcript = isActiveCall === false ? historicalTranscript : liveTranscript
 
   // Auto-scroll transcript
   useEffect(() => {
     transcriptEnd.current?.scrollIntoView({ behavior: 'smooth' })
   }, [transcript])
 
-  // Poll for result on completion
+  // Fetch result on completion
   useEffect(() => {
-    if (!callCompleted || !id) return
+    if (!ws.callCompleted || !id) return
     api.getCallResult(id).then(setResult).catch(() => null)
-  }, [callCompleted, id])
+  }, [ws.callCompleted, id])
 
-  // Poll while active too
+  // Poll while active
   useEffect(() => {
-    if (!id || callCompleted) return
+    if (!id || callCompleted || isActiveCall !== true) return
     const iv = setInterval(() => api.getCallResult(id).then(setResult).catch(() => null), 5000)
     return () => clearInterval(iv)
-  }, [id, callCompleted])
+  }, [id, callCompleted, isActiveCall])
 
   const downloadReport = () => {
     if (!result) return
@@ -63,14 +89,19 @@ export default function CallDetail() {
     match: d.match,
   }))
 
-  const overallStatus = result?.overall_status ?? (callCompleted ? 'completed' : 'in_progress')
+  const overallStatus = result?.overall_status ?? result?.call_outcome ?? (callCompleted ? 'completed' : 'in_progress')
+
+  // Show loading while we determine call state
+  if (isActiveCall === null) {
+    return <div className="flex items-center justify-center h-full text-gray-400">Loading call details...</div>
+  }
 
   return (
     <div className="flex flex-col h-full">
       {/* Status bar */}
       <div className="bg-white border-b border-gray-200 px-6 py-3 flex items-center gap-4">
         <div className="flex items-center gap-2">
-          {isConnected ? (
+          {isActiveCall && isConnected ? (
             <><Wifi className="w-4 h-4 text-green-500" /><span className="text-xs text-green-600 font-medium">Live</span></>
           ) : callCompleted ? (
             <><WifiOff className="w-4 h-4 text-gray-400" /><span className="text-xs text-gray-500">Completed</span></>
@@ -81,9 +112,9 @@ export default function CallDetail() {
         {currentState && (
           <span className="text-xs font-mono bg-gray-100 text-gray-600 px-2 py-1 rounded">{currentState}</span>
         )}
-        {isConnected && <span className="text-sm font-mono text-gray-700">{timer}</span>}
+        {isActiveCall && isConnected && <span className="text-sm font-mono text-gray-700">{timer}</span>}
         <div className="ml-auto flex items-center gap-3">
-          {isConnected && !callCompleted && id && (
+          {isActiveCall && isConnected && !callCompleted && id && (
             <button
               onClick={() => api.stopCall(id).then(() => setStopped(true)).catch(() => null)}
               className="flex items-center gap-1.5 text-sm text-red-600 hover:text-red-800 border border-red-200 px-3 py-1.5 rounded-lg hover:bg-red-50"
@@ -112,7 +143,7 @@ export default function CallDetail() {
           <div className="flex-1 overflow-auto p-4 space-y-3">
             {transcript.length === 0 ? (
               <div className="flex items-center justify-center h-full text-gray-400 text-sm">
-                {isConnected ? 'Waiting for conversation to begin...' : 'Connect to see live transcript'}
+                {isActiveCall && isConnected ? 'Waiting for conversation to begin...' : callCompleted ? 'No transcript recorded' : 'Connect to see live transcript'}
               </div>
             ) : (
               transcript.map((entry, i) => {
@@ -140,7 +171,7 @@ export default function CallDetail() {
           <div className="flex-1 overflow-auto">
             {fields.length === 0 ? (
               <div className="flex items-center justify-center h-full text-gray-400 text-sm p-4 text-center">
-                Results will appear here as the agent collects information
+                {callCompleted ? 'No verification data collected' : 'Results will appear here as the agent collects information'}
               </div>
             ) : (
               <table className="w-full text-xs">

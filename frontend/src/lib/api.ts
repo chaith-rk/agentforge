@@ -115,4 +115,6 @@ export const api = {
     }),
   stopCall: (id: string) =>
     apiFetch<{ status: string }>(`/calls/${id}/stop`, { method: 'POST' }),
+  getCallTranscript: (id: string) =>
+    apiFetch<Array<{ role: string; content: string; timestamp: string }>>(`/calls/${id}/transcript`),
 }

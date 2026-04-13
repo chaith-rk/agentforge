@@ -217,7 +217,7 @@ class EventStore:
             return dict(zip(columns, row))
 
     async def list_sessions(self, limit: int = 50, offset: int = 0) -> list[dict[str, Any]]:
-        """List sessions with pagination."""
+        """List sessions with pagination, parsing JSON fields."""
         if not self._db:
             raise RuntimeError("EventStore not initialized.")
 
@@ -227,7 +227,24 @@ class EventStore:
         ) as cursor:
             rows = await cursor.fetchall()
             columns = [desc[0] for desc in cursor.description]
-            return [dict(zip(columns, row)) for row in rows]
+            results = []
+            for row in rows:
+                session = dict(zip(columns, row))
+                # Parse JSON string fields into dicts
+                for json_field in ("candidate_json", "collected_data_json"):
+                    raw = session.get(json_field, "{}")
+                    try:
+                        session[json_field] = json.loads(raw) if isinstance(raw, str) else raw
+                    except (json.JSONDecodeError, TypeError):
+                        session[json_field] = {}
+                # Expose candidate data at top level for frontend convenience
+                candidate = session.get("candidate_json", {})
+                if isinstance(candidate, dict):
+                    session["collected_data"] = {
+                        "subject_name": candidate.get("subject_name", ""),
+                    }
+                results.append(session)
+            return results
 
     async def create_snapshot(self, session_id: str, snapshot_data: dict[str, Any]) -> None:
         """Create a point-in-time snapshot of session state."""
@@ -239,6 +256,20 @@ class EventStore:
             (session_id, json.dumps(snapshot_data)),
         )
         await self._db.commit()
+
+    async def get_snapshot(self, session_id: str) -> dict[str, Any] | None:
+        """Get the most recent snapshot for a session."""
+        if not self._db:
+            raise RuntimeError("EventStore not initialized.")
+
+        async with self._db.execute(
+            "SELECT snapshot_json FROM data_snapshots WHERE session_id = ? ORDER BY id DESC LIMIT 1",
+            (session_id,),
+        ) as cursor:
+            row = await cursor.fetchone()
+            if not row:
+                return None
+            return json.loads(row[0])
 
     async def get_stats(self) -> dict[str, Any]:
         """Get aggregate call statistics from the sessions table.
