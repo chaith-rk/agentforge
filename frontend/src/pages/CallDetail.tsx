@@ -28,21 +28,33 @@ export default function CallDetail() {
   // Check if this is an active or completed call on mount
   useEffect(() => {
     if (!id) return
+
+    // First try to get the call result (works for both active and completed)
     api.getCallResult(id)
       .then((res) => {
         setResult(res)
         // The active call result has status: "in_progress" explicitly set.
-        // Snapshots have outcome field (e.g. "completed", "no_record", etc.) but no status.
+        // Snapshots/completed calls have outcome field but no status, or status != "in_progress".
         const isActive = res.status === 'in_progress'
         setIsActiveCall(isActive)
         if (!isActive) {
-          // Load transcript from events for completed calls
           api.getCallTranscript(id).then(setHistoricalTranscript).catch(() => null)
         }
       })
       .catch(() => {
-        // If result not found, assume it might be active
-        setIsActiveCall(true)
+        // Can't determine status — try the call status endpoint as fallback
+        api.getCall(id)
+          .then((call) => {
+            const isActive = call.outcome === 'in_progress' || call.status === 'in_progress'
+            setIsActiveCall(isActive)
+            if (!isActive) {
+              api.getCallTranscript(id).then(setHistoricalTranscript).catch(() => null)
+            }
+          })
+          .catch(() => {
+            // Both failed — default to NOT active (don't show phantom call)
+            setIsActiveCall(false)
+          })
       })
   }, [id])
 
