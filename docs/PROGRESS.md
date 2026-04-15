@@ -1,18 +1,59 @@
 # Progress Tracker — AgentForge Platform
 
-**Last Updated:** 2026-04-10
+**Last Updated:** 2026-04-14
 
 ## Current Status
 
-**Code is production-ready; deployment is paused.** End-to-end call flow
-works locally. Today's session hardened the codebase for prod (fail-closed
-auth, volume-aware SQLite, PII redaction in logs, 105 tests) and produced
-a full deploy runbook at `docs/RUNBOOK.md`. The Railway project exists
-but has no backend service yet. Vercel not started.
+**Deployed to production.** Backend on Railway
+(`agentforge-production-8b4f.up.railway.app`), frontend on Vercel
+(`agentforge-iota.vercel.app`). Outbound calls work end-to-end. Call
+completion, transcript display, and verification results all render in
+the dashboard for completed calls.
 
-**Next (separate session):** Work through `docs/RUNBOOK.md` §0.2 onward —
-create Railway backend service from GitHub, mount volume at `/app/data`,
-set env vars, deploy, smoke test, then Vercel and Vapi wiring.
+**Known remaining issues (non-blocking):**
+- Real-time transcript streaming over WebSocket is intermittent;
+  transcript reliably loads after call completion via REST fallback.
+- Vapi `conversation-update` broadcasts may not always arrive at
+  connected clients — investigate websocket broadcast from
+  `handle_conversation_update` in a follow-up session.
+- Phantom "Live" state when revisiting some old calls — mitigated but
+  if `/result` errors, frontend now defaults to not-active rather than
+  showing a fake live call.
+- Verification "Claimed" column shows `—` for all fields (candidate
+  claims not flowing through to the verification record).
+- Agent frequently records `"Yes"`/`"No"` as the employer value instead
+  of the actual data — prompt tuning issue, not a code bug.
+
+**Deploy fixes applied this session (2026-04-14):**
+- Railway `startCommand` removed from `railway.json` — now uses
+  Dockerfile CMD (`sh -c` form) for proper `${PORT}` expansion.
+- Entrypoint script (`entrypoint.sh`) chowns `/app/data` to the
+  `agentforge` user before dropping privileges, so the SQLite volume
+  mount (owned by root by default on Railway) is writable.
+- Healthcheck uses dynamic `${PORT}` env var, not hardcoded 8000.
+- `get_call_result` endpoint now reads from `data_snapshots` for
+  completed calls (was reading `call_sessions` which had empty
+  `collected_data_json`).
+- New `/api/calls/{id}/transcript` endpoint reconstructs transcript
+  from the event log for historical calls.
+- `list_sessions` now parses JSON string columns and exposes the
+  candidate name at the top level for the call history table.
+- `verified_value` → `employer_value` in `to_report_dict()` — frontend
+  was reading `employer_value` so the "Confirmed" column was blank.
+- Structlog now reaches stdout (previously no Python logging root was
+  configured, so all app logs were silently dropped in Railway).
+- `CallDetail` page now checks the call's completion state on mount
+  before connecting the WebSocket, eliminating the phantom timer on
+  historical calls.
+
+**Next session:**
+- Investigate why real-time transcript broadcasts aren't reaching
+  connected WebSocket clients — likely either a session ID resolution
+  issue or an exception being swallowed in the broadcast path.
+- Fix candidate claims flowing into the verification record so
+  "Claimed" column populates.
+- Prompt-tune so the agent records actual employer responses
+  verbatim, not summary "Yes"/"No".
 
 ---
 

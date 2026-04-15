@@ -305,6 +305,52 @@ Railway volume was not mounted or `DATABASE_PATH` doesn't point at it.
 Add/verify the volume, set `DATABASE_PATH=/app/data/calls.db`, redeploy.
 The history is gone — there's no undo unless you have a snapshot.
 
+### Symptom: Railway deploy fails with "Invalid value for '--port'"
+
+The `startCommand` in `railway.json` is passed directly to the container
+without shell interpolation, so `${PORT:-8000}` is not expanded. Either
+wrap in `sh -c '...'` or remove the `startCommand` entirely and let the
+Dockerfile CMD (which uses the `sh -c` exec form) handle it. Current
+repo uses the latter approach.
+
+### Symptom: Railway deploy fails with "unable to open database file"
+
+Railway mounts volumes as `root` by default, but the app runs as the
+non-root `agentforge` user and can't write to `/app/data`. The entrypoint
+script (`entrypoint.sh`) chowns the volume before dropping to
+`agentforge` — this must run as root, so the Dockerfile CMD calls
+`/app/entrypoint.sh` (not `USER agentforge` at image level).
+
+### Symptom: Deploy succeeds but public domain returns 502
+
+Domain is mapped to the wrong port. In Railway → Settings → Networking,
+remove the hardcoded port so Railway auto-detects from the `PORT` env
+var, or set it to match what uvicorn is actually binding to.
+
+### Symptom: No structured logs in Railway, only uvicorn access logs
+
+Python's root logger wasn't configured, so structlog's `stdlib.LoggerFactory`
+output went nowhere. Fixed in `src/main.py` with `logging.basicConfig`.
+If you see only `INFO: 100.64.x.x ...` lines and no JSON log events,
+this regressed.
+
+### Symptom: Completed call shows "Live / In Progress" in the UI
+
+Either:
+1. The `end-of-call-report` webhook arrived while the backend was
+   restarting, so the session stayed in `status=in_progress` in the
+   DB. The `/result` endpoint now detects this (no active call + no
+   snapshot + status=in_progress) and returns `status=unknown`.
+2. `/result` errored and the frontend defaulted to "active". Frontend
+   now defaults to not-active on error and falls back to the `/calls/{id}`
+   endpoint.
+
+### Symptom: "Confirmed" column is blank for all fields
+
+The `to_report_dict()` method previously emitted `verified_value` but the
+frontend's `FieldVerification` type expects `employer_value`. Fixed —
+if this regresses, check `src/models/verification_record.py`.
+
 ### Symptom: CORS error in the browser console
 
 `CORS_ORIGINS` in Railway doesn't include your Vercel domain. It must
