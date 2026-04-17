@@ -55,14 +55,15 @@ AI voice agent platform for automated verification calls (employment, education,
 
 ## Testing
 - Tests in `tests/` — run: `pytest tests/`
-- 105 tests: 31 eval + 37 agent config + 18 event store + 17 webhook handler + 18 API endpoint + 2 API call integration
-- Open test gaps: LLM-based evals (stubs only), red-team scenarios (not automated)
+- 124 tests: 31 eval + 37 agent config + 18 event store + 17 webhook handler + 18 API endpoint + 2 API call integration + 9 verification record + 4 data recorder + 6 summary generator
+- Open test gaps: LLM-based evals (stubs only), red-team scenarios (not automated), post-call report end-to-end (unit-tested, not yet validated against a real call)
 
 ## Production Deployment
 - **Single source of truth:** `docs/RUNBOOK.md` — deploy steps, env var reference, ops commands, troubleshooting
 - **Security posture:** webhook HMAC auth and API key middleware fail closed in production when secrets are missing (return 503). In dev they fail open with a warning.
 - **Database:** SQLite at `settings.database_path` (default `data/calls.db`). Railway must mount a persistent volume at the parent directory or data wipes on deploy.
 - **Active call state is in-memory:** do not redeploy during live calls; check `/health` → `active_calls` first.
+- **Post-call summary:** optional — requires `ANTHROPIC_API_KEY` in Railway env. If unset, the summary section on the call report is empty; the rest of the report renders normally.
 
 ## Git Conventions
 - Branch naming: `feature/`, `fix/`, `docs/`

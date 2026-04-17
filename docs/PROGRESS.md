@@ -1,6 +1,6 @@
 # Progress Tracker — AgentForge Platform
 
-**Last Updated:** 2026-04-14
+**Last Updated:** 2026-04-16
 
 ## Current Status
 
@@ -9,6 +9,13 @@
 (`agentforge-iota.vercel.app`). Outbound calls work end-to-end. Call
 completion, transcript display, and verification results all render in
 the dashboard for completed calls.
+
+**🟡 In progress — Post-Call Report feature (2026-04-16):**
+Competitor-style post-call report added. Backend + frontend code merged
+to `claude/priceless-blackwell` branch, unit tests passing (124 total,
+up from 105). **End-to-end testing pending** — not yet validated against
+a real completed call in local dev, not yet deployed to Railway/Vercel.
+See "Phase 9" below.
 
 **Known remaining issues (non-blocking):**
 - Real-time transcript streaming over WebSocket is intermittent;
@@ -162,6 +169,42 @@ Deploy actions remaining (to do next session):
 
 ### Phase 8: Red-Teaming 🔲
 **Status:** Not started — 11 scenarios defined.
+
+### Phase 9: Post-Call Verification Report 🟡
+**Status:** Code merged to `claude/priceless-blackwell`, unit tests passing. End-to-end testing pending. Not yet deployed.
+**Started:** 2026-04-16
+
+Competitor-inspired post-call report that replaces the compact
+verification table on the Call Detail page once a call is completed.
+Includes a narrative summary, Cross-Verification Summary (Confirmed
+Facts / Items to Clarify / Contradictions counts), and a 5-column
+report table (Question / Prior Answer / Call Answer / Status /
+Confidence).
+
+Code done:
+- [x] `FieldVerification` extended with `question` and `confidence` (`src/models/verification_record.py`)
+- [x] `VerificationRecord` extended with `summary` field and three count properties (`confirmed_facts_count`, `contradictions_count`, `items_to_clarify_count`)
+- [x] `DataRecorder.confidence_map` — per-field confidence from the agent's tool calls is now persisted (previously stripped)
+- [x] `_build_verification_record()` plumbs `question` + `confidence` into `FieldVerification`
+- [x] `to_report_dict()` surfaces all new fields
+- [x] `src/engine/summary_generator.py` — new module, calls Anthropic API (Claude Haiku by default) with PII-redacted transcript/results; fails gracefully to empty string
+- [x] `CallManager.complete_call()` invokes summary generation post-eval, pre-snapshot
+- [x] `ANTHROPIC_API_KEY` + `SUMMARY_MODEL` added to `Settings` and `.env.example`
+- [x] Frontend types extended in `frontend/src/lib/api.ts`
+- [x] Three new components: `CallSummary.tsx`, `CrossVerificationSummary.tsx`, `VerificationReportTable.tsx`
+- [x] `CallDetail.tsx` composes the new report on completed calls; keeps compact table for live calls
+- [x] 19 new unit tests: `tests/test_verification_record.py` (9), `tests/test_data_recorder.py` (4), `tests/test_summary_generator.py` (6)
+
+Testing pending:
+- [ ] Local end-to-end: restart backend with `ANTHROPIC_API_KEY` set, place a test call, verify narrative summary renders, counts match, confidence pills populate
+- [ ] Failure mode: confirm graceful degrade when `ANTHROPIC_API_KEY` is unset (report still renders, summary section empty)
+- [ ] PII safety: confirm no candidate names / phone numbers appear in summary-generation logs
+- [ ] Production deploy: push branch, set `ANTHROPIC_API_KEY` in Railway, redeploy frontend to Vercel, place live test call
+- [ ] Confirm the existing "Yes"/"No" employer-value bug doesn't make the new report misleading (prompt tuning follow-up)
+
+Graceful degrade properties:
+- If Anthropic API is unreachable or the key is missing, the summary field is empty and the rest of the report renders unchanged. No blocking of call completion.
+- PII redaction via `redact_pii()` applied to transcript + results before any outbound API call.
 
 ---
 

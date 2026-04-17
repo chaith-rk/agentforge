@@ -39,6 +39,10 @@ class Settings(BaseSettings):
     vapi_phone_number_id: str = ""
     vapi_server_url: str = ""  # webhook URL Vapi calls back (ngrok or hosted)
 
+    # Anthropic (post-call summary generation)
+    anthropic_api_key: str = ""
+    summary_model: str = "claude-haiku-4-5-20251001"
+
     # Database
     # database_url kept for SQLAlchemy-style tooling compatibility.
     # database_path is the actual filesystem path used by aiosqlite

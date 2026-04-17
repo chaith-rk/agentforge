@@ -21,11 +21,13 @@ class FieldVerification(BaseModel):
 
     field_name: str
     display_name: str = ""
+    question: str = ""
     candidate_value: Any = None
     employer_value: Any = None
     match: bool | None = None
     not_provided: bool = False
     note: str = ""
+    confidence: str | None = None
 
     @property
     def status(self) -> str:
@@ -85,10 +87,28 @@ class VerificationRecord(BaseModel):
     # Callback for follow-up
     callback_number: str = ""
 
+    # Narrative summary of the call (generated post-call)
+    summary: str = ""
+
     # Timestamps
     call_started_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     call_completed_at: datetime | None = None
     record_generated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    @property
+    def confirmed_facts_count(self) -> int:
+        """Number of fields with status 'verified' (exact match)."""
+        return sum(1 for fv in self.field_verifications if fv.status == "verified")
+
+    @property
+    def contradictions_count(self) -> int:
+        """Number of fields with status 'review_needed' (values differ)."""
+        return sum(1 for fv in self.field_verifications if fv.status == "review_needed")
+
+    @property
+    def items_to_clarify_count(self) -> int:
+        """Number of fields with status 'unable_to_verify' (not provided / not asked)."""
+        return sum(1 for fv in self.field_verifications if fv.status == "unable_to_verify")
 
     @property
     def overall_status(self) -> str:
@@ -113,11 +133,13 @@ class VerificationRecord(BaseModel):
             fields.append({
                 "field_name": fv.field_name,
                 "display_name": fv.display_name or fv.field_name,
+                "question": fv.question,
                 "candidate_value": fv.candidate_value,
                 "employer_value": fv.employer_value,
                 "status": fv.status,
                 "match": fv.match,
                 "note": fv.note,
+                "confidence": fv.confidence,
             })
 
         return {
@@ -130,6 +152,10 @@ class VerificationRecord(BaseModel):
             "outcome": self.outcome.value,
             "confidence": self.confidence.value,
             "fields": fields,
+            "summary": self.summary,
+            "confirmed_facts_count": self.confirmed_facts_count,
+            "contradictions_count": self.contradictions_count,
+            "items_to_clarify_count": self.items_to_clarify_count,
             "has_discrepancies": len(self.discrepancies) > 0,
             "discrepancy_count": len(self.discrepancies),
             "fields_refused": self.fields_refused,

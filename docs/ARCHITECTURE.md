@@ -52,8 +52,9 @@
 |-----------|------|---------------|
 | State Machine | `state_machine.py` | Processes events, manages transitions, enforces compliance checkpoints before allowing state changes |
 | Compliance Validator | `compliance_validator.py` | Evaluates named compliance rules against call context. Rules are registered via decorator and referenced by name in YAML |
-| Data Recorder | `data_recorder.py` | Records verification data points, detects discrepancies, validates against schema |
+| Data Recorder | `data_recorder.py` | Records verification data points with per-field confidence, detects discrepancies, validates against schema |
 | Audit Logger | `audit_logger.py` | Logs every event with timestamp, session ID, event type, and actor |
+| Summary Generator | `summary_generator.py` | Post-call narrative summary via Anthropic Messages API (PII-redacted input, graceful degrade on failure). Optional — requires `ANTHROPIC_API_KEY`. |
 
 **Key design:** The state machine checks compliance checkpoints *before* allowing transitions. A BLOCK-level checkpoint (like `recorded_line_disclosure`) physically prevents the conversation from advancing. This is infrastructure-enforced compliance — stronger than prompt-based compliance.
 

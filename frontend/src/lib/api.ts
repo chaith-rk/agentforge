@@ -72,15 +72,21 @@ export interface CallResult {
   fields?: FieldVerification[]
   verifier_name?: string
   verifier_title?: string
+  summary?: string
+  confirmed_facts_count?: number
+  contradictions_count?: number
+  items_to_clarify_count?: number
 }
 
 export interface FieldVerification {
   field_name: string
   display_name: string
+  question?: string
   candidate_value: unknown
   employer_value: unknown
   status: string
   match: boolean | null
+  confidence?: string | null
 }
 
 export interface InitiateCallRequest {

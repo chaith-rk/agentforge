@@ -168,6 +168,8 @@ If any of those fail, see **Troubleshooting** below before debugging blind.
 | `DATABASE_PATH` | yes in prod | Point at the volume mount, e.g. `/app/data/calls.db`. |
 | `CORS_ORIGINS` | yes in prod | JSON array of allowed frontend origins. |
 | `LOG_LEVEL` | optional | Default `INFO`. Set to `DEBUG` temporarily when debugging. |
+| `ANTHROPIC_API_KEY` | optional | Enables post-call narrative summary on the Call Report. Issued at https://console.anthropic.com/settings/keys. If unset, the summary section is empty but the rest of the report still renders. |
+| `SUMMARY_MODEL` | optional | Anthropic model used for summary generation. Default `claude-haiku-4-5-20251001`. |
 
 ### Frontend (Vercel)
 
@@ -356,6 +358,25 @@ if this regresses, check `src/models/verification_record.py`.
 `CORS_ORIGINS` in Railway doesn't include your Vercel domain. It must
 be valid JSON: `["https://agentforge.vercel.app"]`.
 
+### Symptom: Call Report shows "No summary available" after every call
+
+`ANTHROPIC_API_KEY` is unset or invalid in Railway. This is a
+non-blocking failure by design — the rest of the report (counts,
+table, status) still renders. To enable summaries:
+1. Add `ANTHROPIC_API_KEY=sk-ant-...` under Railway → Variables.
+2. Redeploy the service.
+3. Check logs for `summary_skipped_no_api_key` (unset) or
+   `summary_generation_failed` (key present but API error, e.g. no
+   credit on the Anthropic account).
+
+### Symptom: Call Report Confidence column shows "—" for every field
+
+The agent never self-reported a confidence on its `record_data_point`
+tool calls. This is prompt-tuning territory — the AI has the
+`confidence` parameter available but isn't populating it consistently.
+No code action needed; tune the system prompt in
+`prompts/employment_verification_call.md` or the agent YAML.
+
 ---
 
 ## 5. Red-team scenarios (to run before real candidates)
@@ -384,3 +405,34 @@ is a scripted conversation you dial yourself.
   `tool_calls_payload_debug` log that dumped raw tool call payloads.
 - **Frontend**: `frontend/.env.example` created with the three
   `VITE_*` vars used by the code.
+
+---
+
+## 7. Quick reference: what changed in the 2026-04-16 post-call-report session
+
+Status: **code merged, unit tests green, end-to-end testing pending**.
+Not yet deployed.
+
+- **New feature**: Call Detail page now shows a post-call report on
+  completed calls — narrative summary, Cross-Verification Summary
+  (Confirmed Facts / Items to Clarify / Contradictions), and a
+  5-column table (Question / Prior Answer / Call Answer / Status /
+  Confidence).
+- **New env var**: `ANTHROPIC_API_KEY` (optional) drives the post-call
+  summary. Graceful degrade if unset. Get one at
+  https://console.anthropic.com/settings/keys.
+- **New backend module**: `src/engine/summary_generator.py` — calls
+  Anthropic Messages API with a PII-redacted transcript + results,
+  returns empty string on any failure.
+- **Data model**: `FieldVerification` gained `question` and
+  `confidence`. `VerificationRecord` gained `summary` +
+  three count properties. All surface through
+  `to_report_dict()` → `/api/calls/{id}/result`.
+- **Frontend components**: `CallSummary.tsx`,
+  `CrossVerificationSummary.tsx`, `VerificationReportTable.tsx`. The
+  live-call view still uses the old compact table.
+- **Tests**: 105 → 124 passing (+19). New files:
+  `tests/test_verification_record.py`, `tests/test_data_recorder.py`,
+  `tests/test_summary_generator.py`.
+- **Deploy reminder**: set `ANTHROPIC_API_KEY` in Railway before
+  deploying the backend, or summaries will silently no-op in prod.

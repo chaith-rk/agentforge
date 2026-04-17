@@ -28,6 +28,7 @@ class DataRecorder:
     def __init__(self, session_id: str) -> None:
         self._session_id = session_id
         self._data: dict[str, Any] = {}
+        self._confidence: dict[str, str] = {}
         self._events: list[BaseEvent] = []
         self._discrepancies: list[dict[str, Any]] = []
 
@@ -35,6 +36,11 @@ class DataRecorder:
     def collected_data(self) -> dict[str, Any]:
         """All data points collected so far."""
         return dict(self._data)
+
+    @property
+    def confidence_map(self) -> dict[str, str]:
+        """Agent-reported confidence per field (high/medium/low)."""
+        return dict(self._confidence)
 
     @property
     def discrepancies(self) -> list[dict[str, Any]]:
@@ -65,6 +71,7 @@ class DataRecorder:
             The event that was emitted.
         """
         self._data[field_name] = value
+        self._confidence[field_name] = confidence
 
         event = DataPointRecordedEvent(
             session_id=self._session_id,

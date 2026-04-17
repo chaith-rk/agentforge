@@ -3,7 +3,10 @@ import { useParams } from 'react-router-dom'
 import { Wifi, WifiOff, Download, PhoneOff } from 'lucide-react'
 import { useCallWebSocket } from '../hooks/useCallWebSocket'
 import { StatusBadge } from '../components/StatusBadge'
-import { api, type CallResult } from '../lib/api'
+import { CallSummary } from '../components/CallSummary'
+import { CrossVerificationSummary } from '../components/CrossVerificationSummary'
+import { VerificationReportTable } from '../components/VerificationReportTable'
+import { api, type CallResult, type FieldVerification } from '../lib/api'
 
 function useTimer(running: boolean) {
   const [seconds, setSeconds] = useState(0)
@@ -94,7 +97,7 @@ export default function CallDetail() {
     URL.revokeObjectURL(url)
   }
 
-  const fields = result?.fields ?? collectedData.map((d) => ({
+  const fields: FieldVerification[] = result?.fields ?? collectedData.map((d) => ({
     field_name: d.field_name,
     display_name: d.display_name,
     candidate_value: d.candidate_value,
@@ -176,16 +179,31 @@ export default function CallDetail() {
           </div>
         </div>
 
-        {/* Verification results */}
-        <div className="w-96 flex flex-col bg-white">
-          <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-gray-700">Verification Results</h2>
+        {/* Verification results / post-call report */}
+        <div className="w-[32rem] flex flex-col bg-white overflow-hidden">
+          <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between shrink-0">
+            <h2 className="text-sm font-semibold text-gray-700">
+              {callCompleted ? 'Call Report' : 'Verification Results'}
+            </h2>
             {fields.length > 0 && <StatusBadge status={overallStatus} />}
           </div>
           <div className="flex-1 overflow-auto">
-            {fields.length === 0 ? (
+            {callCompleted ? (
+              <>
+                <CallSummary
+                  summary={result?.summary}
+                  pending={result?.summary === undefined || result?.summary === ''}
+                />
+                <CrossVerificationSummary
+                  confirmed={result?.confirmed_facts_count ?? fields.filter((f) => f.status === 'verified').length}
+                  toClarify={result?.items_to_clarify_count ?? fields.filter((f) => f.status === 'unable_to_verify').length}
+                  contradictions={result?.contradictions_count ?? fields.filter((f) => f.status === 'review_needed').length}
+                />
+                <VerificationReportTable fields={fields} />
+              </>
+            ) : fields.length === 0 ? (
               <div className="flex items-center justify-center h-full text-gray-400 text-sm p-4 text-center">
-                {callCompleted ? 'No verification data collected' : 'Results will appear here as the agent collects information'}
+                Results will appear here as the agent collects information
               </div>
             ) : (
               <table className="w-full text-xs">

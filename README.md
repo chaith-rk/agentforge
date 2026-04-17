@@ -181,6 +181,9 @@ WebSocket-based live call monitoring. Connected clients receive transcript updat
 ### PII Encryption at Rest
 Fields classified as MEDIUM or HIGH PII sensitivity are encrypted at rest using Fernet symmetric encryption. Encryption decisions are driven by the agent's data schema, ensuring consistent protection across all agent types.
 
+### Post-Call Verification Report 🟡 (testing pending)
+On call completion the Call Detail page renders a structured report: a short narrative summary, a Cross-Verification Summary (Confirmed Facts / Items to Clarify / Contradictions counts), and a 5-column table of question, candidate's prior answer, employer's call answer, verification status, and agent confidence. The summary is generated post-call via the Anthropic API (Claude Haiku) over a PII-redacted transcript; generation fails gracefully if `ANTHROPIC_API_KEY` is unset.
+
 ## Security
 
 This platform handles sensitive PII during employment verification. Security measures include:
@@ -206,6 +209,7 @@ See [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md) for the full threat model.
 - [Product Requirements Document](docs/PRD.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Progress Tracker](docs/PROGRESS.md)
+- [Production Runbook](docs/RUNBOOK.md)
 - [Threat Model](docs/THREAT_MODEL.md)
 - [Presentation Outline](docs/PRESENTATION_OUTLINE.md)
 - [Architecture Decision Records](docs/ADR/README.md)

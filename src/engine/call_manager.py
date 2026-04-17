@@ -24,6 +24,7 @@ from src.engine.audit_logger import AuditLogger
 from src.engine.data_recorder import DataRecorder
 from src.engine.evals import EvalResult, EvalRunner
 from src.engine.state_machine import StateMachine
+from src.engine.summary_generator import generate_summary
 from src.models.call_session import CallOutcome, CallSession, CandidateClaim, ConfidenceLevel
 from src.models.events import BaseEvent, EventType
 from src.models.verification_record import FieldVerification, VerificationRecord
@@ -341,7 +342,16 @@ class CallManager:
         except Exception:
             logger.exception("eval_pipeline_error", session_id=session_id)
 
-        # Snapshot the final state (includes eval results)
+        # Generate post-call narrative summary — failure must not block completion
+        try:
+            record.summary = await generate_summary(
+                transcript=call.session.transcript,
+                report=record.to_report_dict(),
+            )
+        except Exception:
+            logger.exception("summary_generation_error", session_id=session_id)
+
+        # Snapshot the final state (includes eval results + summary)
         await self._event_store.create_snapshot(
             session_id, record.to_report_dict()
         )
@@ -387,6 +397,7 @@ class CallManager:
         hardcoding field names.
         """
         collected = call.data_recorder.collected_data
+        confidence_map = call.data_recorder.confidence_map
         candidate = call.session.candidate
         candidate_claims = candidate.claims
 
@@ -417,10 +428,12 @@ class CallManager:
                 field_verifications.append(FieldVerification(
                     field_name=field_name,
                     display_name=field_schema.display_name or field_schema.description,
+                    question=field_schema.question,
                     candidate_value=candidate_value,
                     employer_value=employer_value,
                     match=match,
                     not_provided=employer_value is None,
+                    confidence=confidence_map.get(field_name),
                 ))
 
         audit_event_ids = [e.event_id for e in call.audit_logger.events]
